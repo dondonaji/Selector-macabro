@@ -16,6 +16,7 @@ interface WebSource {
 
 interface ArchiveCatalogViewProps {
   savedIds: string[];
+  posterMode?: 'official' | 'artistic';
   onToggleSave: (filmId: string) => void;
   onSelectFilm: (film: HorrorFilm) => void;
   discoveredFilms: HorrorFilm[];
@@ -24,6 +25,7 @@ interface ArchiveCatalogViewProps {
 
 export function ArchiveCatalogView({
   savedIds,
+  posterMode = 'official',
   onToggleSave,
   onSelectFilm,
   discoveredFilms,
@@ -32,7 +34,6 @@ export function ArchiveCatalogView({
   const [query, setQuery] = useState('');
   const [branchFilter, setBranchFilter] = useState<'all' | BranchId>('all');
   const [goreFilter, setGoreFilter] = useState<'Todos' | GoreLevel>('Todos');
-  const [posterMode, setPosterMode] = useState<'official' | 'artistic'>('official');
 
   const [isSearchingWeb, setIsSearchingWeb] = useState(false);
   const [webError, setWebError] = useState<string | null>(null);
@@ -217,35 +218,6 @@ export function ArchiveCatalogView({
                 {g === 'Todos' ? 'Todo nivel gráfico' : `Gore ${g.toLowerCase()}`}
               </button>
             ))}
-          </div>
-
-          <div
-            role="group"
-            aria-label="Estilo visual de los carteles"
-            className="flex items-center gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730]"
-          >
-            <button
-              type="button"
-              onClick={() => setPosterMode('official')}
-              className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                posterMode === 'official'
-                  ? 'bg-[#DC2626] text-white'
-                  : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
-              }`}
-            >
-              Cartel
-            </button>
-            <button
-              type="button"
-              onClick={() => setPosterMode('artistic')}
-              className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                posterMode === 'artistic'
-                  ? 'bg-[#272730] text-[#F5F2EB]'
-                  : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
-              }`}
-            >
-              Lámina arte
-            </button>
           </div>
         </div>
       </div>

@@ -1,11 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Bookmark, Film, GitFork, GitMerge, RotateCcw } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Bookmark,
+  Check,
+  Download,
+  Film,
+  GitFork,
+  GitMerge,
+  RotateCcw,
+  Share2,
+  Shuffle,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import heroBackdropImg from './assets/images/hero_cinema_backdrop_1795575584534.jpg';
 import { ArchiveCatalogView } from './components/ArchiveCatalogView';
 import { FilmDossierModal } from './components/FilmDossierModal';
 import { HorrorTreeSelector } from './components/HorrorTreeSelector';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { PWAInstallButton } from './components/PWAInstallButton';
+import { PWAInstallInstructionsModal } from './components/PWAInstallButton';
 import { SessionDrawer } from './components/SessionDrawer';
 import { SubgenreCrossingsView } from './components/SubgenreCrossingsView';
 import {
@@ -14,7 +27,51 @@ import {
   HORROR_TAXONOMY,
   HorrorFilm,
 } from './data/horrorTaxonomy';
+import { usePWAInstall } from './hooks/usePWAInstall';
 import { soundEngine } from './utils/soundEffects';
+
+function MacabreHamburgerIcon({ open }: { open: boolean }) {
+  if (open) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        className="w-5 h-5 text-[#DC2626]"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M5 5L19 19" />
+        <path d="M19 5L5 19" />
+        <polygon points="12,10 14,12 12,14 10,12" fill="currentColor" stroke="none" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-5 h-5 text-[#F5F2EB]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {/* Top blade bar */}
+      <path d="M3.5 6.5H17.5L20.5 5" />
+      {/* Middle ritual spine bar with crimson fang diamond */}
+      <path d="M3.5 12H9.5" />
+      <polygon points="12,10.2 13.8,12 12,13.8 10.2,12" fill="#DC2626" stroke="none" />
+      <path d="M14.5 12H20.5" />
+      {/* Bottom notched bone bar */}
+      <path d="M3.5 17.5L6.5 19H20.5" />
+    </svg>
+  );
+}
 
 type ActiveTab = 'tree' | 'crossings' | 'archive';
 
@@ -103,6 +160,16 @@ export default function App() {
     initialRoute.filmDossier
   );
 
+  const [posterMode, setPosterMode] = useState<'official' | 'artistic'>('official');
+  const [audioEnabled, setAudioEnabled] = useState<boolean>(soundEngine.isEnabled());
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [copiedRoute, setCopiedRoute] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [randomScrollToken, setRandomScrollToken] = useState(0);
+
+  const menuContainerRef = useRef<HTMLDivElement | null>(null);
+  const { canPrompt, isInstalled, isIOS, promptInstall } = usePWAInstall();
+
   useEffect(() => {
     const params = new URLSearchParams();
     if (activeTab === 'crossings') params.set('vista', 'cruces');
@@ -188,12 +255,63 @@ export default function App() {
     );
   };
 
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMenuOpen]);
+
+  const handleToggleAudio = () => {
+    const next = soundEngine.toggle();
+    setAudioEnabled(next);
+  };
+
+  const handleRandomDescent = () => {
+    const randomBranch =
+      HORROR_TAXONOMY[Math.floor(Math.random() * HORROR_TAXONOMY.length)];
+    const randomSub =
+      randomBranch.subgenres[Math.floor(Math.random() * randomBranch.subgenres.length)];
+    const randomFocus =
+      randomSub.focuses[Math.floor(Math.random() * randomSub.focuses.length)];
+
+    soundEngine.playReveal();
+    setActiveTab('tree');
+    setSelectedBranchId(randomBranch.id);
+    setSelectedSubgenreId(randomSub.id);
+    setSelectedFocusId(randomFocus.id);
+    setIsMenuOpen(false);
+    setRandomScrollToken((t) => t + 1);
+  };
+
+  const handleInstallAppClick = async () => {
+    soundEngine.playClick(230);
+    setIsMenuOpen(false);
+    if (canPrompt) {
+      await promptInstall();
+      return;
+    }
+    setShowInstallModal(true);
+  };
+
   const handleResetTree = () => {
     soundEngine.playClick(150);
     setActiveTab('tree');
     setSelectedBranchId(null);
     setSelectedSubgenreId(null);
     setSelectedFocusId(null);
+    setIsMenuOpen(false);
   };
 
   const handleExploreBranch = (
@@ -296,34 +414,207 @@ export default function App() {
             </button>
           </nav>
 
-          {/* Zone 3: 1 Primary Action */}
-          <div className="flex items-center shrink-0">
+          {/* Zone 3: 3 Compact Icon Controls (Audio, Reset, Macabre Menu) */}
+          <div ref={menuContainerRef} className="relative flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleToggleAudio}
+              aria-pressed={audioEnabled}
+              aria-label={audioEnabled ? 'Silenciar audio ambiente' : 'Activar audio ambiente'}
+              title={audioEnabled ? 'Silenciar audio ambiente' : 'Activar audio ambiente'}
+              className={`min-w-[44px] min-h-[44px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center rounded-lg border transition-colors ${
+                audioEnabled
+                  ? 'bg-[#DC2626]/15 border-[#DC2626]/70 text-[#F5F2EB]'
+                  : 'bg-[#18181D] border-[#272730] hover:border-[#DC2626] text-[#A1A1AA] hover:text-[#F5F2EB]'
+              }`}
+            >
+              {audioEnabled ? (
+                <Volume2 className="w-[18px] h-[18px] text-[#DC2626]" aria-hidden="true" />
+              ) : (
+                <VolumeX className="w-[18px] h-[18px]" aria-hidden="true" />
+              )}
+            </button>
+
             <button
               type="button"
               onClick={handleResetTree}
-              className="inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 min-h-[40px] sm:min-h-[36px] rounded-lg bg-[#18181D] border border-[#272730] hover:border-[#DC2626] text-xs font-medium text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0"
+              aria-label="Reiniciar selector"
+              title="Reiniciar selector"
+              className="min-w-[44px] min-h-[44px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center rounded-lg bg-[#18181D] border border-[#272730] hover:border-[#DC2626] text-[#F5F2EB] transition-colors"
             >
-              <RotateCcw className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
-              <span>Reiniciar</span>
+              <RotateCcw className="w-[18px] h-[18px] text-[#DC2626]" aria-hidden="true" />
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playClick(220);
+                setIsMenuOpen((v) => !v);
+              }}
+              aria-expanded={isMenuOpen}
+              aria-haspopup="menu"
+              aria-label={isMenuOpen ? 'Cerrar menú de opciones' : 'Abrir menú macabro de opciones'}
+              title="Opciones del selector"
+              className={`min-w-[44px] min-h-[44px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center rounded-lg border transition-colors ${
+                isMenuOpen
+                  ? 'bg-[#1D1215] border-[#DC2626]'
+                  : 'bg-[#18181D] border-[#272730] hover:border-[#DC2626]'
+              }`}
+            >
+              <MacabreHamburgerIcon open={isMenuOpen} />
+            </button>
+
+            <AnimatePresence>
+              {isMenuOpen && (
+                <motion.div
+                  key="macabre-header-menu"
+                  role="menu"
+                  aria-label="Opciones de Selector Macabro"
+                  initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                  transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-xl bg-[#121216]/95 backdrop-blur-md border border-[#272730] shadow-[0_24px_60px_rgba(0,0,0,0.9)] p-2.5 space-y-2 z-50"
+                >
+                  {/* Poster Visual Mode Switch */}
+                  <div className="p-2 rounded-lg bg-[#0A0A0D] border border-[#272730]/80 space-y-2">
+                    <span className="block text-[11px] font-mono text-[#A1A1AA] px-1">
+                      Visualización de carteles
+                    </span>
+                    <div
+                      role="group"
+                      aria-label="Estilo visual de los carteles"
+                      className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730]"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEngine.playClick(240);
+                          setPosterMode('official');
+                        }}
+                        className={`min-h-[40px] sm:min-h-[34px] px-2.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+                          posterMode === 'official'
+                            ? 'bg-[#DC2626] text-white'
+                            : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
+                        }`}
+                      >
+                        Cartel teatral
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEngine.playClick(240);
+                          setPosterMode('artistic');
+                        }}
+                        className={`min-h-[40px] sm:min-h-[34px] px-2.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+                          posterMode === 'artistic'
+                            ? 'bg-[#272730] text-[#F5F2EB]'
+                            : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
+                        }`}
+                      >
+                        Lámina arte
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Menu Action Items */}
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={handleRandomDescent}
+                      className="w-full flex items-center justify-between gap-3 px-3 min-h-[44px] rounded-lg hover:bg-[#18181D] text-left text-xs font-medium text-[#F5F2EB] transition-colors"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <Shuffle className="w-4 h-4 text-[#DC2626]" aria-hidden="true" />
+                        <span>Elegir ruta al azar</span>
+                      </span>
+                      <span className="font-mono text-[10px] text-[#71717A]">3 niveles</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={async () => {
+                        soundEngine.playClick(250);
+                        const ok = await handleShareUrl();
+                        if (ok) {
+                          setCopiedRoute(true);
+                          window.setTimeout(() => setCopiedRoute(false), 2000);
+                        }
+                      }}
+                      className="w-full flex items-center justify-between gap-3 px-3 min-h-[44px] rounded-lg hover:bg-[#18181D] text-left text-xs font-medium text-[#F5F2EB] transition-colors"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        {copiedRoute ? (
+                          <Check className="w-4 h-4 text-[#DC2626]" aria-hidden="true" />
+                        ) : (
+                          <Share2 className="w-4 h-4 text-[#D6C7B2]" aria-hidden="true" />
+                        )}
+                        <span>{copiedRoute ? 'Enlace copiado' : 'Compartir esta ruta'}</span>
+                      </span>
+                    </button>
+
+                    {!isInstalled && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={handleInstallAppClick}
+                        className="w-full flex items-center justify-between gap-3 px-3 min-h-[44px] rounded-lg bg-[#18181D]/60 hover:bg-[#1D1215] border border-[#272730] hover:border-[#DC2626]/60 text-left text-xs font-medium text-[#F5F2EB] transition-colors"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Download className="w-4 h-4 text-[#DC2626]" aria-hidden="true" />
+                          <span>Instalar app</span>
+                        </span>
+                        <span className="font-mono text-[10px] text-[#A1A1AA]">PWA</span>
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </header>
 
       {/* Main Content Stage */}
-      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {activeTab === 'tree' && (
-          <section aria-label="Introducción al selector" className="mb-6 sm:mb-10 max-w-3xl">
-            <p className="text-xs font-mono text-[#DC2626] mb-1.5 sm:mb-2">
-              Mapa de géneros y subgéneros · De mayor a menor ·{' '}
-              {HORROR_FILMS.length + discoveredFilms.length} películas
-            </p>
-            <h1 className="font-display text-3xl sm:text-5xl font-semibold text-[#F5F2EB] leading-[1.08] text-balance">
-              Encuentra qué película de terror ver según el miedo que buscas
-            </h1>
-            <p className="text-sm sm:text-base text-[#A1A1AA] mt-2 sm:mt-3 leading-relaxed">
-              Navega paso a paso desde los cinco troncos clásicos del terror hacia sus subgéneros y escenarios específicos, con indicadores claros de tensión, sustos y violencia gráfica.
-            </p>
+          <section
+            aria-label="Introducción al selector"
+            className="relative mb-6 sm:mb-9 rounded-xl overflow-hidden border border-[#272730] bg-[#0B0B0E]"
+          >
+            {/* Atmospheric Screening Room Backdrop */}
+            <img
+              src={heroBackdropImg}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full object-cover object-center opacity-50 sm:opacity-45"
+            />
+            <div
+              className="absolute inset-0 bg-gradient-to-t from-[#08080A] via-[#08080A]/65 to-[#08080A]/45"
+              aria-hidden="true"
+            />
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-[#08080A]/90 via-[#08080A]/55 to-transparent"
+              aria-hidden="true"
+            />
+            <div
+              className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,_rgba(220,38,38,0.16),_transparent_58%)] pointer-events-none"
+              aria-hidden="true"
+            />
+
+            <div className="relative z-10 px-5 py-7 sm:px-8 sm:py-11 lg:px-10 lg:py-12 max-w-3xl">
+              <p className="text-[11px] sm:text-xs font-mono tracking-wider uppercase text-[#DC2626] mb-2">
+                Mapa taxonómico · {HORROR_FILMS.length + discoveredFilms.length} obras
+              </p>
+              <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-[#F5F2EB] leading-[1.03] tracking-tight text-balance drop-shadow-[0_2px_18px_rgba(0,0,0,0.85)]">
+                Encuentra el terror exacto para esta noche
+              </h1>
+              <p className="text-xs sm:text-sm text-[#A1A1AA]/75 mt-2.5 sm:mt-3 max-w-xl leading-relaxed">
+                Desciende por ramas desde los cinco troncos del género hasta tu atmósfera ideal.
+              </p>
+            </div>
           </section>
         )}
 
@@ -340,6 +631,8 @@ export default function App() {
                 selectedBranchId={selectedBranchId}
                 selectedSubgenreId={selectedSubgenreId}
                 selectedFocusId={selectedFocusId}
+                posterMode={posterMode}
+                randomScrollToken={randomScrollToken}
                 onSelectBranch={setSelectedBranchId}
                 onSelectSubgenre={setSelectedSubgenreId}
                 onSelectFocus={setSelectedFocusId}
@@ -349,7 +642,6 @@ export default function App() {
                 onSelectFilm={setActiveFilmDossier}
                 discoveredFilms={discoveredFilms}
                 onAddDiscoveredFilms={handleAddDiscoveredFilms}
-                onShareRoute={() => handleShareUrl()}
               />
             </motion.div>
           )}
@@ -379,6 +671,7 @@ export default function App() {
             >
               <ArchiveCatalogView
                 savedIds={savedIds}
+                posterMode={posterMode}
                 onToggleSave={handleToggleSave}
                 onSelectFilm={setActiveFilmDossier}
                 discoveredFilms={discoveredFilms}
@@ -423,7 +716,6 @@ export default function App() {
             >
               Mi Sesión ({savedIds.length})
             </button>
-            <PWAInstallButton />
           </div>
         </div>
       </footer>
@@ -516,6 +808,13 @@ export default function App() {
         onRemove={handleToggleSave}
         onClearAll={() => setSavedIds([])}
         onSelectFilm={(film) => setActiveFilmDossier(film)}
+      />
+
+      {/* PWA Install Instructions Modal */}
+      <PWAInstallInstructionsModal
+        isOpen={showInstallModal}
+        isIOS={isIOS}
+        onClose={() => setShowInstallModal(false)}
       />
     </div>
   );

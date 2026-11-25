@@ -28,14 +28,14 @@ export function FilmCard({
       transition={{ duration: 0.25, delay: Math.min(index * 0.04, 0.2), ease: [0.16, 1, 0.3, 1] }}
       className="group flex flex-col justify-between bg-[#121216] border border-[#272730] rounded-lg overflow-hidden transition-colors duration-200 hover:border-[#DC2626]/60"
     >
-      <div className="p-4 sm:p-5 space-y-4">
-        {/* Top Split: 2:3 Theatrical Poster + Core Editorial Info */}
-        <div className="grid grid-cols-[96px_1fr] sm:grid-cols-[116px_1fr] gap-3.5 sm:gap-4 items-start">
+      <div className="flex flex-col sm:p-5 sm:space-y-4">
+        {/* Top Split: Full-bleed theatrical showcase on mobile (< sm), 2:3 thumbnail + editorial split on sm+ */}
+        <div className="flex flex-col sm:grid sm:grid-cols-[120px_1fr] sm:gap-4 sm:items-start">
           <button
             type="button"
             onClick={() => onSelectFilm(film)}
             aria-label={`Abrir ficha y cartel de ${film.title}`}
-            className="block w-full focus-visible:outline-2 focus-visible:outline-[#DC2626] rounded"
+            className="relative block w-full focus-visible:outline-2 focus-visible:outline-[#DC2626] sm:rounded overflow-hidden"
           >
             <PosterArt
               id={film.id}
@@ -47,10 +47,15 @@ export function FilmCard({
               keyMotif={film.keyMotif}
               initialPoster={film.poster}
               mode={posterMode}
+              className="rounded-none sm:rounded border-0 border-b border-[#272730] sm:border"
+            />
+            <div
+              className="sm:hidden absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#121216] via-[#121216]/55 to-transparent pointer-events-none"
+              aria-hidden="true"
             />
           </button>
 
-          <div className="min-w-0">
+          <div className="min-w-0 px-4 pt-2 sm:p-0">
             {/* Unboxed Metadata Line */}
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-mono text-[#D6C7B2] tabular-nums mb-1">
               <span>{film.year}</span>
@@ -67,7 +72,7 @@ export function FilmCard({
               )}
             </div>
 
-            <h3 className="font-display text-xl sm:text-2xl font-semibold text-[#F5F2EB] leading-tight tracking-tight mb-1">
+            <h3 className="font-display text-2xl font-semibold text-[#F5F2EB] leading-tight tracking-tight mb-1">
               <button
                 type="button"
                 onClick={() => onSelectFilm(film)}
@@ -81,30 +86,31 @@ export function FilmCard({
               {film.director} · {film.country}
             </p>
 
-            <p className="text-xs sm:text-sm text-[#D4D4D8] leading-relaxed line-clamp-4">
+            <p className="text-sm sm:text-xs md:text-sm text-[#D4D4D8] leading-relaxed line-clamp-3 sm:line-clamp-4">
               {film.whyWatch}
             </p>
           </div>
         </div>
 
-        {/* Key Elements as unboxed inline text */}
-        <p className="text-xs text-[#A1A1AA]">
-          {film.keyElements.join(' · ')}
-        </p>
+        {/* Key Elements + Fear Profile Table */}
+        <div className="px-4 pb-4 pt-3 sm:p-0 space-y-3 sm:space-y-4">
+          <p className="text-xs text-[#A1A1AA]">
+            {film.keyElements.join(' · ')}
+          </p>
 
-        {/* Fear Profile Table */}
-        <div className="border-t border-[#272730] pt-3 grid grid-cols-3 gap-2 text-xs">
-          <div>
-            <span className="block font-mono text-[#71717A] mb-0.5">Tensión</span>
-            <span className="font-medium text-[#F5F2EB]">{film.fearProfile.tension}</span>
-          </div>
-          <div>
-            <span className="block font-mono text-[#71717A] mb-0.5">Sustos</span>
-            <span className="font-medium text-[#F5F2EB]">{film.fearProfile.jumpscares}</span>
-          </div>
-          <div>
-            <span className="block font-mono text-[#71717A] mb-0.5">Gore</span>
-            <span className="font-medium text-[#DC2626]">{film.fearProfile.gore}</span>
+          <div className="border-t border-[#272730] pt-3 grid grid-cols-3 gap-2 text-xs">
+            <div>
+              <span className="block font-mono text-[#71717A] mb-0.5">Tensión</span>
+              <span className="font-medium text-[#F5F2EB]">{film.fearProfile.tension}</span>
+            </div>
+            <div>
+              <span className="block font-mono text-[#71717A] mb-0.5">Sustos</span>
+              <span className="font-medium text-[#F5F2EB]">{film.fearProfile.jumpscares}</span>
+            </div>
+            <div>
+              <span className="block font-mono text-[#71717A] mb-0.5">Gore</span>
+              <span className="font-medium text-[#DC2626]">{film.fearProfile.gore}</span>
+            </div>
           </div>
         </div>
       </div>

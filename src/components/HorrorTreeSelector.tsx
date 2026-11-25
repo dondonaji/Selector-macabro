@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  Check,
-  ChevronLeft,
+  ArrowDown,
   ChevronRight,
   ExternalLink,
   Globe,
   Loader2,
   RotateCcw,
-  Share2,
-  Shuffle,
   SlidersHorizontal,
-  Volume2,
-  VolumeX,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -25,7 +20,6 @@ import {
 } from '../data/horrorTaxonomy';
 import { soundEngine } from '../utils/soundEffects';
 import { FilmCard } from './FilmCard';
-import { PWAInstallButton } from './PWAInstallButton';
 
 interface WebSource {
   uri: string;
@@ -36,6 +30,8 @@ interface HorrorTreeSelectorProps {
   selectedBranchId: BranchId | null;
   selectedSubgenreId: string | null;
   selectedFocusId: string | null;
+  posterMode: 'official' | 'artistic';
+  randomScrollToken?: number;
   onSelectBranch: (id: BranchId | null) => void;
   onSelectSubgenre: (id: string | null) => void;
   onSelectFocus: (id: string | null) => void;
@@ -45,7 +41,6 @@ interface HorrorTreeSelectorProps {
   onSelectFilm: (film: HorrorFilm) => void;
   discoveredFilms: HorrorFilm[];
   onAddDiscoveredFilms: (films: HorrorFilm[]) => void;
-  onShareRoute: () => Promise<boolean>;
 }
 
 interface CurvePath {
@@ -58,6 +53,8 @@ export function HorrorTreeSelector({
   selectedBranchId,
   selectedSubgenreId,
   selectedFocusId,
+  posterMode,
+  randomScrollToken = 0,
   onSelectBranch,
   onSelectSubgenre,
   onSelectFocus,
@@ -67,15 +64,11 @@ export function HorrorTreeSelector({
   onSelectFilm,
   discoveredFilms,
   onAddDiscoveredFilms,
-  onShareRoute,
 }: HorrorTreeSelectorProps) {
   const [eraFilter, setEraFilter] = useState<'Todas' | EraType>('Todas');
   const [pacingFilter, setPacingFilter] = useState<'Todos' | PacingType>('Todos');
   const [goreFilter, setGoreFilter] = useState<'Todos' | GoreLevel>('Todos');
-  const [posterMode, setPosterMode] = useState<'official' | 'artistic'>('official');
-  const [audioEnabled, setAudioEnabled] = useState<boolean>(soundEngine.isEnabled());
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [copiedRoute, setCopiedRoute] = useState(false);
 
   const [mobileStep, setMobileStep] = useState<1 | 2 | 3>(() =>
     selectedSubgenreId ? 3 : selectedBranchId ? 2 : 1
@@ -104,6 +97,19 @@ export function HorrorTreeSelector({
       setMobileStep(3);
     }
   }, [selectedBranchId, selectedSubgenreId]);
+
+  useEffect(() => {
+    if (randomScrollToken === 0) return;
+    setEraFilter('Todas');
+    setPacingFilter('Todos');
+    setGoreFilter('Todos');
+    setMobileStep(3);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      window.setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 90);
+    }
+  }, [randomScrollToken]);
 
   const selectedBranch = HORROR_TAXONOMY.find((b) => b.id === selectedBranchId) ?? null;
   const selectedSubgenre =
@@ -195,11 +201,6 @@ export function HorrorTreeSelector({
     };
   }, [computeConnectors]);
 
-  const handleToggleAudio = () => {
-    const next = soundEngine.toggle();
-    setAudioEnabled(next);
-  };
-
   const handleBranchClick = (branchId: BranchId) => {
     soundEngine.playClick(185);
     if (selectedBranchId === branchId) {
@@ -226,29 +227,6 @@ export function HorrorTreeSelector({
   const handleFocusClick = (focusId: string) => {
     soundEngine.playReveal();
     onSelectFocus(focusId);
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-      requestAnimationFrame(() => {
-        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    }
-  };
-
-  const handleRandomDescent = () => {
-    const randomBranch =
-      HORROR_TAXONOMY[Math.floor(Math.random() * HORROR_TAXONOMY.length)];
-    const randomSub =
-      randomBranch.subgenres[Math.floor(Math.random() * randomBranch.subgenres.length)];
-    const randomFocus =
-      randomSub.focuses[Math.floor(Math.random() * randomSub.focuses.length)];
-
-    soundEngine.playReveal();
-    onSelectBranch(randomBranch.id);
-    onSelectSubgenre(randomSub.id);
-    onSelectFocus(randomFocus.id);
-    setMobileStep(3);
-    setEraFilter('Todas');
-    setPacingFilter('Todos');
-    setGoreFilter('Todos');
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       requestAnimationFrame(() => {
         resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -353,9 +331,9 @@ export function HorrorTreeSelector({
     (goreFilter !== 'Todos' ? 1 : 0);
 
   return (
-    <div className="space-y-8 lg:space-y-10">
-      {/* Stage Toolbar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#272730]">
+    <div className="space-y-7 lg:space-y-10">
+      {/* Clean Taxonomic Route Breadcrumb */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#272730]">
         <nav
           aria-label="Ruta actual en el árbol de géneros"
           className="flex flex-wrap items-center gap-1.5 text-xs sm:text-sm"
@@ -367,7 +345,7 @@ export function HorrorTreeSelector({
               onResetAll();
               setMobileStep(1);
             }}
-            className={`px-2.5 min-h-[36px] sm:min-h-0 sm:py-1 rounded transition-colors ${
+            className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1 rounded transition-colors ${
               !selectedBranch
                 ? 'text-[#F5F2EB] font-medium bg-[#18181D]'
                 : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
@@ -387,7 +365,7 @@ export function HorrorTreeSelector({
                   onSelectFocus(null);
                   setMobileStep(2);
                 }}
-                className={`px-2.5 min-h-[36px] sm:min-h-0 sm:py-1 rounded transition-colors ${
+                className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1 rounded transition-colors ${
                   !selectedSubgenre
                     ? 'text-[#F5F2EB] font-medium bg-[#18181D]'
                     : 'text-[#D6C7B2] hover:text-[#F5F2EB]'
@@ -408,7 +386,7 @@ export function HorrorTreeSelector({
                   onSelectFocus(null);
                   setMobileStep(3);
                 }}
-                className={`px-2.5 min-h-[36px] sm:min-h-0 sm:py-1 rounded transition-colors ${
+                className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1 rounded transition-colors ${
                   !selectedFocus
                     ? 'text-[#F5F2EB] font-medium bg-[#18181D]'
                     : 'text-[#D6C7B2] hover:text-[#F5F2EB]'
@@ -429,353 +407,398 @@ export function HorrorTreeSelector({
           )}
         </nav>
 
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-          {/* Poster Art Mode Toggle */}
-          <div
-            role="group"
-            aria-label="Estilo visual de los carteles"
-            className="flex items-center gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730]"
-          >
-            <button
-              type="button"
-              onClick={() => {
-                soundEngine.playClick(240);
-                setPosterMode('official');
-              }}
-              className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                posterMode === 'official'
-                  ? 'bg-[#DC2626] text-white'
-                  : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
-              }`}
-            >
-              Cartel teatral
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                soundEngine.playClick(240);
-                setPosterMode('artistic');
-              }}
-              className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                posterMode === 'artistic'
-                  ? 'bg-[#272730] text-[#F5F2EB]'
-                  : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
-              }`}
-            >
-              Lámina arte
-            </button>
-          </div>
-
+        {selectedBranch && (
           <button
             type="button"
-            onClick={handleRandomDescent}
-            className="inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 min-h-[44px] sm:min-h-0 sm:py-2 rounded-lg bg-[#18181D] border border-[#272730] hover:border-[#DC2626] text-xs font-medium text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0"
+            onClick={() =>
+              resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+            className="lg:hidden inline-flex items-center gap-1.5 text-xs font-mono text-[#DC2626] min-h-[38px] px-1 whitespace-nowrap"
           >
-            <Shuffle className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
-            <span>Al azar</span>
+            <span>Ver {displayedFilms.length} títulos</span>
+            <ArrowDown className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
-
-          <button
-            type="button"
-            onClick={handleToggleAudio}
-            aria-pressed={audioEnabled}
-            className={`inline-flex items-center justify-center gap-2 px-3.5 min-h-[44px] sm:min-h-0 sm:py-2 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-              audioEnabled
-                ? 'bg-[#DC2626]/15 border-[#DC2626]/60 text-[#F5F2EB]'
-                : 'bg-[#121216] border-[#272730] text-[#A1A1AA] hover:text-[#F5F2EB]'
-            }`}
-          >
-            {audioEnabled ? (
-              <Volume2 className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
-            ) : (
-              <VolumeX className="w-3.5 h-3.5" aria-hidden="true" />
-            )}
-            <span className="hidden sm:inline">{audioEnabled ? 'Audio activo' : 'Audio ambiente'}</span>
-            <span className="sm:hidden">{audioEnabled ? 'Audio' : 'Sonido'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={async () => {
-              soundEngine.playClick(250);
-              const ok = await onShareRoute();
-              if (ok) {
-                setCopiedRoute(true);
-                window.setTimeout(() => setCopiedRoute(false), 2000);
-              }
-            }}
-            className="inline-flex items-center justify-center gap-2 px-3.5 min-h-[44px] sm:min-h-0 sm:py-2 rounded-lg bg-[#18181D] border border-[#272730] hover:border-[#DC2626] text-xs font-medium text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0"
-          >
-            {copiedRoute ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
-                <span>Enlace copiado</span>
-              </>
-            ) : (
-              <>
-                <Share2 className="w-3.5 h-3.5 text-[#D6C7B2]" aria-hidden="true" />
-                <span>Compartir</span>
-              </>
-            )}
-          </button>
-
-          <PWAInstallButton />
-        </div>
+        )}
       </div>
 
-      {/* MOBILE PROGRESSIVE STEPPER (< lg): 1 Level at a Time */}
-      <section aria-label="Selector paso a paso móvil" className="lg:hidden space-y-4">
-        {/* Stepper Tabs */}
-        <div
-          role="tablist"
-          aria-label="Pasos de selección"
-          className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730]"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileStep === 1}
-            onClick={() => {
-              soundEngine.playClick(180);
-              setMobileStep(1);
-            }}
-            className={`min-h-[44px] px-2 rounded text-xs font-medium transition-colors truncate ${
-              mobileStep === 1
-                ? 'bg-[#DC2626] text-white'
-                : 'text-[#D4D4D8] hover:text-[#F5F2EB]'
-            }`}
-          >
-            1. Género
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileStep === 2}
-            disabled={!selectedBranch}
-            onClick={() => {
-              if (!selectedBranch) return;
-              soundEngine.playClick(200);
-              setMobileStep(2);
-            }}
-            className={`min-h-[44px] px-2 rounded text-xs font-medium transition-colors truncate disabled:opacity-40 ${
-              mobileStep === 2
-                ? 'bg-[#DC2626] text-white'
-                : 'text-[#D4D4D8] hover:text-[#F5F2EB]'
-            }`}
-          >
-            2. Subgénero
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileStep === 3}
-            disabled={!selectedSubgenre}
-            onClick={() => {
-              if (!selectedSubgenre) return;
-              soundEngine.playClick(220);
-              setMobileStep(3);
-            }}
-            className={`min-h-[44px] px-2 rounded text-xs font-medium transition-colors truncate disabled:opacity-40 ${
-              mobileStep === 3
-                ? 'bg-[#DC2626] text-white'
-                : 'text-[#D4D4D8] hover:text-[#F5F2EB]'
-            }`}
-          >
-            3. Enfoque
-          </button>
+      {/* MOBILE VERTICAL BRANCHING LINEAGE TREE (< lg) */}
+      <section aria-label="Árbol vertical de decisión en tres niveles" className="lg:hidden">
+        {/* PILAR 1: GRAN GÉNERO */}
+        <div>
+          {!selectedBranch || mobileStep === 1 ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex w-2.5 h-2.5 rotate-45 bg-[#DC2626]" aria-hidden="true" />
+                  <h2 className="font-display text-2xl font-semibold text-[#F5F2EB]">
+                    1. El Tronco del Miedo
+                  </h2>
+                </div>
+                <span className="text-[11px] font-mono text-[#A1A1AA]">5 ramas</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                {HORROR_TAXONOMY.map((branch, idx) => {
+                  const isSelected = selectedBranchId === branch.id;
+                  const isWide = idx === 0;
+                  return (
+                    <button
+                      key={branch.id}
+                      type="button"
+                      onClick={() => handleBranchClick(branch.id)}
+                      aria-pressed={isSelected}
+                      className={`group relative text-left rounded-xl overflow-hidden border transition-all ${
+                        isWide ? 'col-span-2 min-h-[116px]' : 'min-h-[132px]'
+                      } ${
+                        isSelected
+                          ? 'border-[#DC2626] bg-[#161215] shadow-[0_0_24px_rgba(220,38,38,0.18)]'
+                          : 'border-[#272730] bg-[#121216] hover:border-[#52525B]'
+                      }`}
+                    >
+                      <img
+                        src={branch.image}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className={`absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-active:scale-[1.03] ${
+                          isSelected ? 'opacity-45' : 'opacity-30'
+                        }`}
+                      />
+                      <div
+                        className="absolute inset-0 bg-gradient-to-t from-[#08080A] via-[#08080A]/75 to-[#08080A]/35"
+                        aria-hidden="true"
+                      />
+                      <div className="relative h-full p-3.5 flex flex-col justify-between gap-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-[11px] text-[#DC2626]">
+                            0{branch.index}
+                          </span>
+                          <span className="font-mono text-[10px] text-[#A1A1AA] tabular-nums">
+                            18 obras
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-display text-xl font-semibold text-[#F5F2EB] leading-tight">
+                            {branch.name}
+                          </p>
+                          <p className="text-[11px] text-[#A1A1AA] mt-1 line-clamp-2 leading-snug">
+                            {branch.coreQuestion}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            /* Compact Connected Node for Selected Level 1 Branch */
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playClick(180);
+                setMobileStep(1);
+              }}
+              aria-expanded={false}
+              className="group relative w-full text-left rounded-xl overflow-hidden border border-[#DC2626]/70 bg-[#151114] transition-colors min-h-[68px]"
+            >
+              <img
+                src={selectedBranch.image}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="absolute inset-0 w-full h-full object-cover opacity-30"
+              />
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-[#08080A]/95 via-[#08080A]/80 to-[#08080A]/65"
+                aria-hidden="true"
+              />
+              <div className="relative px-4 py-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-3 h-3 rotate-45 bg-[#DC2626] shrink-0 shadow-[0_0_12px_rgba(220,38,38,0.8)]" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <span className="block font-mono text-[10px] uppercase tracking-wider text-[#DC2626]">
+                      1 · Gran Género
+                    </span>
+                    <p className="font-display text-xl font-semibold text-[#F5F2EB] truncate leading-tight">
+                      {selectedBranch.name}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-mono text-[#D6C7B2] group-hover:text-[#F5F2EB] shrink-0 px-2 py-1 rounded border border-[#272730] bg-[#08080A]/80">
+                  Cambiar
+                </span>
+              </div>
+            </button>
+          )}
         </div>
 
-        <AnimatePresence mode="wait">
-          {mobileStep === 1 && (
+        {/* SVG LINEAGE STEM: PILAR 1 -> PILAR 2 */}
+        <div className="flex items-center pl-5 h-7" aria-hidden="true">
+          <svg viewBox="0 0 24 28" className="w-6 h-7 overflow-visible">
+            <motion.line
+              x1="12"
+              y1="0"
+              x2="12"
+              y2="28"
+              stroke={selectedBranch ? '#DC2626' : '#272730'}
+              strokeWidth={selectedBranch ? 2 : 1.5}
+              strokeDasharray={selectedBranch ? undefined : '3 3'}
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 0.25 }}
+            />
+            {selectedBranch && (
+              <polygon points="12,11 15,14 12,17 9,14" fill="#DC2626" />
+            )}
+          </svg>
+        </div>
+
+        {/* PILAR 2: SUBGÉNERO */}
+        <div>
+          {!selectedBranch ? (
+            <div className="rounded-xl border border-dashed border-[#272730] bg-[#0C0C0F]/80 px-4 py-3.5 flex items-center gap-3">
+              <span className="w-2.5 h-2.5 rounded-full border border-[#52525B] shrink-0" aria-hidden="true" />
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-wider text-[#71717A]">
+                  2 · Subgénero
+                </p>
+                <p className="text-xs text-[#A1A1AA]">
+                  Elige uno de los cinco troncos arriba para desplegar sus subgéneros.
+                </p>
+              </div>
+            </div>
+          ) : mobileStep === 2 || !selectedSubgenre ? (
             <motion.div
-              key="mobile-step-1"
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 8 }}
-              transition={{ duration: 0.18 }}
+              key={`lineage-sub-${selectedBranch.id}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
               className="space-y-2.5"
             >
-              <div className="flex items-baseline justify-between">
-                <h2 className="font-display text-xl font-semibold text-[#F5F2EB]">
-                  Elige el gran género
-                </h2>
-                <span className="text-xs font-mono text-[#A1A1AA]">Paso 1 de 3</span>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex w-2.5 h-2.5 rotate-45 bg-[#DC2626]" aria-hidden="true" />
+                  <h2 className="font-display text-2xl font-semibold text-[#F5F2EB]">
+                    2. Ramificación
+                  </h2>
+                </div>
+                <span className="text-[11px] font-mono text-[#D6C7B2]">3 subgéneros</span>
               </div>
 
-              {HORROR_TAXONOMY.map((branch) => {
-                const isSelected = selectedBranchId === branch.id;
-                return (
-                  <button
-                    key={branch.id}
-                    type="button"
-                    onClick={() => handleBranchClick(branch.id)}
-                    aria-pressed={isSelected}
-                    className={`group relative w-full text-left rounded-lg overflow-hidden border transition-all min-h-[72px] ${
-                      isSelected
-                        ? 'border-[#DC2626] bg-[#161215]'
-                        : 'border-[#272730] bg-[#121216] hover:border-[#52525B]'
-                    }`}
-                  >
-                    <img
-                      src={branch.image}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                      className={`absolute inset-0 w-full h-full object-cover ${
-                        isSelected ? 'opacity-35' : 'opacity-20'
+              <div className="relative pl-5 space-y-2.5">
+                {/* Continuous Vertical Crimson Rail */}
+                <div
+                  className="absolute left-[19px] top-0 bottom-5 w-0.5 bg-gradient-to-b from-[#DC2626] via-[#DC2626]/70 to-[#272730]"
+                  aria-hidden="true"
+                />
+
+                {selectedBranch.subgenres.map((sub, idx) => {
+                  const isSelected = selectedSubgenreId === sub.id;
+                  return (
+                    <div key={sub.id} className="relative pl-5">
+                      {/* Horizontal Curved Branch Twig */}
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="absolute -left-0.5 top-6 w-6 h-6 pointer-events-none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M 1 0 Q 1 12 22 12"
+                          fill="none"
+                          stroke={isSelected ? '#DC2626' : '#52525B'}
+                          strokeWidth={isSelected ? 2 : 1.5}
+                        />
+                        <circle
+                          cx="20"
+                          cy="12"
+                          r="2.5"
+                          fill={isSelected ? '#DC2626' : '#52525B'}
+                        />
+                      </svg>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSubgenreClick(sub.id)}
+                        aria-pressed={isSelected}
+                        className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 min-h-[76px] ${
+                          isSelected
+                            ? 'border-[#DC2626] bg-[#191215] shadow-[0_0_20px_rgba(220,38,38,0.14)]'
+                            : 'border-[#272730] bg-[#121216] hover:border-[#52525B]'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="font-mono text-[11px] text-[#DC2626]">
+                              {selectedBranch.index}.{idx + 1}
+                            </span>
+                            <span className="font-mono text-[10px] text-[#71717A]">· 6 títulos</span>
+                          </div>
+                          <p className="font-display text-xl font-semibold text-[#F5F2EB] leading-snug">
+                            {sub.name}
+                          </p>
+                          <p className="text-xs text-[#A1A1AA] mt-0.5 leading-relaxed line-clamp-2">
+                            {sub.description}
+                          </p>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-[#D6C7B2] shrink-0" aria-hidden="true" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ) : (
+            /* Compact Connected Node for Selected Level 2 Subgenre */
+            <button
+              type="button"
+              onClick={() => {
+                soundEngine.playClick(200);
+                setMobileStep(2);
+              }}
+              aria-expanded={false}
+              className="group w-full text-left rounded-xl border border-[#DC2626]/70 bg-[#151114] px-4 py-3 flex items-center justify-between gap-3 min-h-[64px] transition-colors"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="w-3 h-3 rotate-45 bg-[#DC2626] shrink-0 shadow-[0_0_12px_rgba(220,38,38,0.8)]" aria-hidden="true" />
+                <div className="min-w-0">
+                  <span className="block font-mono text-[10px] uppercase tracking-wider text-[#DC2626]">
+                    2 · Subgénero
+                  </span>
+                  <p className="font-display text-xl font-semibold text-[#F5F2EB] truncate leading-tight">
+                    {selectedSubgenre.name}
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-mono text-[#D6C7B2] group-hover:text-[#F5F2EB] shrink-0 px-2 py-1 rounded border border-[#272730] bg-[#08080A]/80">
+                Cambiar
+              </span>
+            </button>
+          )}
+        </div>
+
+        {/* SVG LINEAGE Y-FORK: PILAR 2 -> PILAR 3 */}
+        <div className="flex items-center pl-5 h-7" aria-hidden="true">
+          <svg viewBox="0 0 120 28" className="w-32 h-7 overflow-visible">
+            <motion.path
+              d="M 12 0 L 12 10 Q 12 18 22 28"
+              fill="none"
+              stroke={selectedSubgenre ? '#DC2626' : '#272730'}
+              strokeWidth={selectedSubgenre ? 2 : 1.5}
+              strokeDasharray={selectedSubgenre ? undefined : '3 3'}
+            />
+            <motion.path
+              d="M 12 10 Q 12 18 52 20 L 96 20 Q 108 20 108 28"
+              fill="none"
+              stroke={selectedSubgenre ? '#DC2626' : '#272730'}
+              strokeWidth={selectedSubgenre ? 1.5 : 1.25}
+              strokeDasharray={selectedSubgenre ? undefined : '3 3'}
+              opacity={selectedSubgenre ? 0.65 : 0.5}
+            />
+          </svg>
+        </div>
+
+        {/* PILAR 3: ENFOQUE / ATMÓSFERA */}
+        <div>
+          {!selectedSubgenre ? (
+            <div className="rounded-xl border border-dashed border-[#272730] bg-[#0C0C0F]/80 px-4 py-3.5 flex items-center gap-3">
+              <span className="w-2.5 h-2.5 rounded-full border border-[#52525B] shrink-0" aria-hidden="true" />
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-wider text-[#71717A]">
+                  3 · Enfoque o Escenario
+                </p>
+                <p className="text-xs text-[#A1A1AA]">
+                  Bifurca un subgénero para elegir entre dos atmósferas finales.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <motion.div
+              key={`lineage-foc-${selectedSubgenre.id}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex w-2.5 h-2.5 rotate-45 bg-[#DC2626]" aria-hidden="true" />
+                  <h2 className="font-display text-2xl font-semibold text-[#F5F2EB]">
+                    3. Enfoque Final
+                  </h2>
+                </div>
+                <span className="text-[11px] font-mono text-[#D6C7B2]">A o B · 3 películas</span>
+              </div>
+
+              <div className="space-y-2.5">
+                {selectedSubgenre.focuses.map((foc, idx) => {
+                  const isSelected = selectedFocusId === foc.id;
+                  return (
+                    <button
+                      key={foc.id}
+                      type="button"
+                      onClick={() => handleFocusClick(foc.id)}
+                      aria-pressed={isSelected}
+                      className={`group relative w-full text-left p-4 rounded-xl overflow-hidden border transition-all ${
+                        isSelected
+                          ? 'border-[#DC2626] bg-[#1C1215] shadow-[0_0_26px_rgba(220,38,38,0.2)]'
+                          : 'border-[#272730] bg-[#121216] hover:border-[#52525B]'
                       }`}
-                    />
-                    <div
-                      className="absolute inset-0 bg-gradient-to-r from-[#08080A]/95 via-[#08080A]/80 to-[#08080A]/60"
-                      aria-hidden="true"
-                    />
-                    <div className="relative p-3.5 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <span className="font-mono text-[11px] text-[#DC2626] block">
-                          {branch.index}. Rama principal · 18 títulos
-                        </span>
-                        <p className="font-display text-xl font-semibold text-[#F5F2EB] leading-snug">
-                          {branch.name}
+                    >
+                      {selectedBranch && (
+                        <img
+                          src={selectedBranch.image}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          className={`absolute inset-0 w-full h-full object-cover transition-opacity ${
+                            isSelected ? 'opacity-20' : 'opacity-10'
+                          }`}
+                        />
+                      )}
+                      <div
+                        className="absolute inset-0 bg-gradient-to-r from-[#08080A]/95 via-[#08080A]/85 to-[#08080A]/75"
+                        aria-hidden="true"
+                      />
+                      <div className="relative">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="font-mono text-xs text-[#DC2626]">
+                            Enfoque {idx === 0 ? 'A' : 'B'}
+                          </span>
+                          <span className="text-xs font-mono text-[#A1A1AA] tabular-nums">
+                            3 películas
+                          </span>
+                        </div>
+                        <p className="font-display text-2xl font-semibold text-[#F5F2EB] leading-snug">
+                          {foc.name}
                         </p>
-                        <p className="text-xs text-[#A1A1AA] mt-0.5 line-clamp-1">
-                          {branch.coreQuestion}
+                        <p className="text-xs text-[#D4D4D8] mt-1 leading-relaxed">
+                          {foc.subtitle}
                         </p>
+                        <div className="mt-2.5 pt-2.5 border-t border-white/10 text-xs text-[#A1A1AA]">
+                          <span className="font-mono text-[#D6C7B2]">Atmósfera: </span>
+                          {foc.atmosphereNote}
+                        </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-[#D6C7B2] shrink-0" aria-hidden="true" />
-                    </div>
-                  </button>
-                );
-              })}
-            </motion.div>
-          )}
-
-          {mobileStep === 2 && selectedBranch && (
-            <motion.div
-              key={`mobile-step-2-${selectedBranch.id}`}
-              initial={{ opacity: 0, x: 8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.18 }}
-              className="space-y-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMobileStep(1)}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-[#D6C7B2] hover:text-[#F5F2EB] min-h-[44px] pr-2"
-                >
-                  <ChevronLeft className="w-4 h-4 text-[#DC2626]" aria-hidden="true" />
-                  <span>Cambiar género ({selectedBranch.name})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  }
-                  className="text-xs font-mono text-[#DC2626] underline underline-offset-4 min-h-[44px] px-1 whitespace-nowrap"
-                >
-                  Ver películas ({displayedFilms.length})
-                </button>
+                    </button>
+                  );
+                })}
               </div>
 
-              {selectedBranch.subgenres.map((sub, idx) => {
-                const isSelected = selectedSubgenreId === sub.id;
-                return (
+              {selectedFocus && (
+                <div className="pt-1 flex justify-center">
                   <button
-                    key={sub.id}
                     type="button"
-                    onClick={() => handleSubgenreClick(sub.id)}
-                    aria-pressed={isSelected}
-                    className={`w-full text-left p-4 rounded-lg border transition-all flex items-center justify-between gap-3 ${
-                      isSelected
-                        ? 'border-[#DC2626] bg-[#181215]'
-                        : 'border-[#272730] bg-[#121216] hover:border-[#52525B]'
-                    }`}
+                    onClick={() =>
+                      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
+                    className="inline-flex items-center gap-2 px-4 min-h-[40px] rounded-lg border border-[#DC2626]/50 bg-[#181215] text-xs font-mono text-[#F5F2EB] hover:border-[#DC2626] transition-colors"
                   >
-                    <div className="min-w-0">
-                      <span className="font-mono text-xs text-[#D6C7B2] block mb-0.5">
-                        Subgénero {selectedBranch.index}.{idx + 1} · 6 títulos
-                      </span>
-                      <p className="font-display text-xl font-semibold text-[#F5F2EB]">
-                        {sub.name}
-                      </p>
-                      <p className="text-xs text-[#A1A1AA] mt-1 leading-relaxed">
-                        {sub.description}
-                      </p>
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-[#D6C7B2] shrink-0" aria-hidden="true" />
+                    <span>Ver selección de {selectedFocus.name}</span>
+                    <ArrowDown className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
                   </button>
-                );
-              })}
+                </div>
+              )}
             </motion.div>
           )}
-
-          {mobileStep === 3 && selectedBranch && selectedSubgenre && (
-            <motion.div
-              key={`mobile-step-3-${selectedSubgenre.id}`}
-              initial={{ opacity: 0, x: 8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.18 }}
-              className="space-y-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMobileStep(2)}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-[#D6C7B2] hover:text-[#F5F2EB] min-h-[44px] pr-2"
-                >
-                  <ChevronLeft className="w-4 h-4 text-[#DC2626]" aria-hidden="true" />
-                  <span>Cambiar subgénero ({selectedSubgenre.name})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  }
-                  className="text-xs font-mono text-[#DC2626] underline underline-offset-4 min-h-[44px] px-1 whitespace-nowrap"
-                >
-                  Ir a resultados ({displayedFilms.length})
-                </button>
-              </div>
-
-              {selectedSubgenre.focuses.map((foc, idx) => {
-                const isSelected = selectedFocusId === foc.id;
-                return (
-                  <button
-                    key={foc.id}
-                    type="button"
-                    onClick={() => handleFocusClick(foc.id)}
-                    aria-pressed={isSelected}
-                    className={`w-full text-left p-4 rounded-lg border transition-all ${
-                      isSelected
-                        ? 'border-[#DC2626] bg-[#1D1215]'
-                        : 'border-[#272730] bg-[#121216] hover:border-[#52525B]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="font-mono text-xs text-[#DC2626]">
-                        Enfoque {idx === 0 ? 'A' : 'B'}
-                      </span>
-                      <span className="text-xs font-mono text-[#A1A1AA] tabular-nums">
-                        3 películas
-                      </span>
-                    </div>
-                    <p className="font-display text-2xl font-semibold text-[#F5F2EB] leading-snug">
-                      {foc.name}
-                    </p>
-                    <p className="text-xs text-[#D4D4D8] mt-1 leading-relaxed">
-                      {foc.subtitle}
-                    </p>
-                    <div className="mt-2.5 pt-2.5 border-t border-white/5 text-xs text-[#A1A1AA]">
-                      <span className="font-mono text-[#D6C7B2]">Atmósfera: </span>
-                      {foc.atmosphereNote}
-                    </div>
-                  </button>
-                );
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        </div>
       </section>
 
       {/* DESKTOP 3-Column Branching Genre Taxonomy (lg+) */}
@@ -1027,6 +1050,7 @@ export function HorrorTreeSelector({
 
       {/* Preference Filters & Curated Results */}
       <section
+        id="resultados"
         ref={resultsRef}
         aria-label="Películas recomendadas"
         className="pt-6 sm:pt-8 border-t border-[#272730] space-y-5 sm:space-y-6 scroll-mt-4"
