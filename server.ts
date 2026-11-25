@@ -98,7 +98,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Linaje Macabro server listening on http://0.0.0.0:${PORT}`);
+    console.log(`Selector Macabro server listening on http://0.0.0.0:${PORT}`);
   });
 }
 

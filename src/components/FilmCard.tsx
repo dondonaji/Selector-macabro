@@ -30,7 +30,7 @@ export function FilmCard({
     >
       <div className="p-4 sm:p-5 space-y-4">
         {/* Top Split: 2:3 Theatrical Poster + Core Editorial Info */}
-        <div className="grid grid-cols-[108px_1fr] sm:grid-cols-[116px_1fr] gap-4 items-start">
+        <div className="grid grid-cols-[96px_1fr] sm:grid-cols-[116px_1fr] gap-3.5 sm:gap-4 items-start">
           <button
             type="button"
             onClick={() => onSelectFilm(film)}
@@ -67,7 +67,7 @@ export function FilmCard({
               )}
             </div>
 
-            <h3 className="font-display text-2xl font-semibold text-[#F5F2EB] leading-tight tracking-tight mb-1">
+            <h3 className="font-display text-xl sm:text-2xl font-semibold text-[#F5F2EB] leading-tight tracking-tight mb-1">
               <button
                 type="button"
                 onClick={() => onSelectFilm(film)}
@@ -110,11 +110,11 @@ export function FilmCard({
       </div>
 
       {/* Card Footer Actions */}
-      <div className="px-4 sm:px-5 py-3 border-t border-[#272730] bg-[#0E0E12] flex items-center justify-between gap-3">
+      <div className="px-4 sm:px-5 py-2.5 sm:py-3 border-t border-[#272730] bg-[#0E0E12] flex items-center justify-between gap-3">
         <button
           type="button"
           onClick={() => onSelectFilm(film)}
-          className="inline-flex items-center gap-2 text-xs font-medium text-[#F5F2EB] hover:text-[#DC2626] transition-colors whitespace-nowrap shrink-0 py-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#DC2626]"
+          className="inline-flex items-center gap-2 text-xs font-medium text-[#F5F2EB] hover:text-[#DC2626] transition-colors whitespace-nowrap shrink-0 min-h-[44px] sm:min-h-[34px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#DC2626]"
         >
           <SlidersHorizontal className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
           <span>Ver ficha y cruces</span>
@@ -124,7 +124,7 @@ export function FilmCard({
           type="button"
           onClick={() => onToggleSave(film.id)}
           aria-pressed={isSaved}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#DC2626] ${
+          className={`inline-flex items-center gap-1.5 px-3.5 min-h-[44px] sm:min-h-[34px] rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#DC2626] ${
             isSaved
               ? 'bg-[#DC2626]/15 text-[#F5F2EB] border border-[#DC2626]/60'
               : 'bg-[#18181D] text-[#D4D4D8] border border-[#272730] hover:border-[#52525B] hover:text-[#F5F2EB]'

@@ -79,7 +79,7 @@ export function SessionDrawer({
                 type="button"
                 onClick={onClose}
                 aria-label="Cerrar panel de sesión"
-                className="p-2 rounded-lg bg-[#18181D] border border-[#272730] text-[#A1A1AA] hover:text-[#F5F2EB] transition-colors"
+                className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2 flex items-center justify-center rounded-lg bg-[#18181D] border border-[#272730] text-[#A1A1AA] hover:text-[#F5F2EB] transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -120,7 +120,7 @@ export function SessionDrawer({
                       type="button"
                       onClick={() => onRemove(film.id)}
                       aria-label={`Quitar ${film.title} de la sesión`}
-                      className="p-2 rounded text-[#71717A] hover:text-[#DC2626] transition-colors shrink-0"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2 flex items-center justify-center rounded text-[#71717A] hover:text-[#DC2626] transition-colors shrink-0"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -134,14 +134,14 @@ export function SessionDrawer({
                 <button
                   type="button"
                   onClick={onClearAll}
-                  className="text-xs text-[#A1A1AA] hover:text-[#DC2626] transition-colors"
+                  className="text-xs text-[#A1A1AA] hover:text-[#DC2626] transition-colors min-h-[44px] px-1"
                 >
                   Vaciar programa
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-lg bg-[#DC2626] text-white text-xs font-medium hover:bg-[#B91C1C] transition-colors"
+                  className="px-4 min-h-[44px] rounded-lg bg-[#DC2626] text-white text-xs font-medium hover:bg-[#B91C1C] transition-colors"
                 >
                   Seguir explorando
                 </button>

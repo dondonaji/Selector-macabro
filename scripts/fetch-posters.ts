@@ -2,18 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { CachedPoster, WIKI_UA, resolveFilmPoster } from '../lib/horrorBackend.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
 const CACHE_FILE = path.join(ROOT_DIR, 'poster-cache.json');
-const WIKI_UA = 'LinajeMacabro/1.0 (horror-cinema-selector; educational-archive)';
 
 interface FilmRef {
   id: string;
   title: string;
   originalTitle?: string;
   year: number;
+  director: string;
 }
 
 function loadHorrorFilms(): FilmRef[] {
@@ -30,134 +31,112 @@ function loadHorrorFilms(): FilmRef[] {
   return vm.runInNewContext(`(${arrayLiteral})`) as FilmRef[];
 }
 
-interface CachedPoster {
-  posterUrl: string | null;
-  rawUrl: string | null;
-  source: string | null;
-  pageUrl: string | null;
-}
-
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchJson(url: string, attempt = 0): Promise<unknown> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 6000);
-  try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': WIKI_UA },
-      signal: controller.signal,
-    });
-    if (res.status === 429 && attempt < 3) {
-      clearTimeout(timer);
-      const retryAfter = Number(res.headers.get('retry-after')) || 3 * (attempt + 1);
-      await sleep(retryAfter * 1000);
-      return fetchJson(url, attempt + 1);
-    }
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+interface BatchPage {
+  title?: string;
+  missing?: boolean;
+  canonicalurl?: string;
+  categories?: Array<{ title?: string }>;
+  original?: { source?: string; width?: number; height?: number };
 }
 
-async function resolveWikiPoster(
-  lang: 'en' | 'es',
-  queries: string[],
-  year?: number
-): Promise<CachedPoster | null> {
-  const baseApi = `https://${lang}.wikipedia.org/w/api.php`;
+interface BatchResponse {
+  query?: {
+    normalized?: Array<{ from: string; to: string }>;
+    redirects?: Array<{ from: string; to: string }>;
+    pages?: BatchPage[];
+  };
+}
 
-  for (const query of queries) {
-    if (!query.trim()) continue;
-    const searchUrl = `${baseApi}?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=4&format=json`;
-    const searchData = (await fetchJson(searchUrl)) as {
-      query?: { search?: Array<{ title: string; snippet: string }> };
-    } | null;
+async function queryEnBatch(titles: string[], withCategories = false): Promise<Map<string, BatchPage>> {
+  const map = new Map<string, BatchPage>();
+  if (titles.length === 0) return map;
 
-    const results = searchData?.query?.search ?? [];
-    if (results.length === 0) continue;
+  const props = withCategories ? 'pageimages|categories|info' : 'pageimages|info';
+  const extraParams = withCategories ? '&cllimit=500' : '';
+  const url =
+    `https://en.wikipedia.org/w/api.php?action=query` +
+    `&titles=${encodeURIComponent(titles.join('|'))}` +
+    `&redirects=1&prop=${props}&pilicense=any&piprop=original&pilimit=50${extraParams}&inprop=url&format=json&formatversion=2`;
 
-    const yearStr = year ? String(year) : '';
-    const candidate =
-      results.find((r) => {
-        const lowerTitle = r.title.toLowerCase();
-        const lowerSnippet = r.snippet.toLowerCase();
-        const hasFilmWord =
-          lowerTitle.includes('film') ||
-          lowerTitle.includes('película') ||
-          lowerSnippet.includes('film') ||
-          lowerSnippet.includes('película') ||
-          lowerSnippet.includes('directed by') ||
-          lowerSnippet.includes('dirigida por');
-        const hasYear = yearStr
-          ? lowerTitle.includes(yearStr) || lowerSnippet.includes(yearStr)
-          : true;
-        return hasFilmWord && hasYear;
-      }) ??
-      results.find((r) => {
-        const lower = (r.title + ' ' + r.snippet).toLowerCase();
-        return lower.includes('film') || lower.includes('película') || lower.includes('horror');
-      }) ??
-      results[0];
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await fetch(url, { headers: { 'User-Agent': WIKI_UA } });
+    if (res.status === 429) {
+      const waitSec = Number(res.headers.get('retry-after')) || 15 * (attempt + 1);
+      console.log(`Wikipedia 429 en lote; esperando ${waitSec}s...`);
+      await sleep(waitSec * 1000);
+      continue;
+    }
+    if (!res.ok) return map;
 
-    if (!candidate) continue;
+    const data = (await res.json()) as BatchResponse;
+    const pages = data.query?.pages ?? [];
+    const byTitle = new Map<string, BatchPage>();
+    for (const p of pages) {
+      if (p.title && !p.missing) {
+        byTitle.set(p.title, p);
+      }
+    }
 
-    const contentUrl = `${baseApi}?action=query&titles=${encodeURIComponent(candidate.title)}&prop=revisions&rvprop=content&rvsection=0&format=json`;
-    const contentData = (await fetchJson(contentUrl)) as {
-      query?: { pages?: Record<string, { revisions?: Array<{ '*': string }> }> };
-    } | null;
+    const normMap = new Map<string, string>();
+    for (const n of data.query?.normalized ?? []) {
+      normMap.set(n.from, n.to);
+    }
+    const redirMap = new Map<string, string>();
+    for (const r of data.query?.redirects ?? []) {
+      redirMap.set(r.from, r.to);
+    }
 
-    const pages = contentData?.query?.pages ? Object.values(contentData.query.pages) : [];
-    const wikitext = pages[0]?.revisions?.[0]?.['*'] ?? '';
-    if (!wikitext) continue;
-
-    const imageMatch =
-      wikitext.match(/\|\s*(?:image|imagen)\s*=\s*([^\n|\r}]+)/i) ??
-      wikitext.match(/\[\[(?:File|Archivo|Image):([^|\]]+)/i);
-
-    let fileName = imageMatch?.[1]?.trim() ?? '';
-    fileName = fileName
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/^\[\[(?:File|Archivo|Image):/i, '')
-      .replace(/\|.*$/, '')
-      .replace(/\]\]$/, '')
-      .trim();
-
-    if (!fileName || fileName.toLowerCase().endsWith('.svg')) continue;
-
-    const cleanFileTitle =
-      fileName.startsWith('File:') || fileName.startsWith('Archivo:')
-        ? fileName.replace(/^Archivo:/i, 'File:')
-        : `File:${fileName}`;
-
-    const infoUrl = `${baseApi}?action=query&titles=${encodeURIComponent(cleanFileTitle)}&prop=imageinfo&iiprop=url|size&format=json`;
-    const infoData = (await fetchJson(infoUrl)) as {
-      query?: {
-        pages?: Record<string, { imageinfo?: Array<{ url?: string; width?: number }> }>;
-      };
-    } | null;
-
-    const filePages = infoData?.query?.pages ? Object.values(infoData.query.pages) : [];
-    const imgInfo = filePages[0]?.imageinfo?.[0];
-    if (!imgInfo?.url) continue;
-    if (imgInfo.width && imgInfo.width < 160) continue;
-
-    const rawUrl = imgInfo.url.split('?')[0];
-    if (!rawUrl.startsWith('https://upload.wikimedia.org/')) continue;
-
-    return {
-      posterUrl: `/api/poster-image?url=${encodeURIComponent(rawUrl)}`,
-      rawUrl,
-      source: lang === 'en' ? 'Wikipedia (Cartel teatral)' : 'Wikipedia ES (Cartel teatral)',
-      pageUrl: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(candidate.title.replace(/ /g, '_'))}`,
-    };
+    for (const originalQuery of titles) {
+      const step1 = normMap.get(originalQuery) ?? originalQuery;
+      const step2 = redirMap.get(step1) ?? step1;
+      const step3 = redirMap.get(step2) ?? step2;
+      const page = byTitle.get(step3) ?? byTitle.get(step2) ?? byTitle.get(step1);
+      if (page) {
+        map.set(originalQuery, page);
+      }
+    }
+    return map;
   }
 
-  return null;
+  return map;
+}
+
+function isMatchingFilmPage(page: BatchPage, film: FilmRef, requireCategoryCheck: boolean): boolean {
+  const rawUrl = page.original?.source?.split('?')[0] ?? '';
+  if (!rawUrl.startsWith('https://upload.wikimedia.org/')) return false;
+  const lowerUrl = rawUrl.toLowerCase();
+  if (lowerUrl.endsWith('.svg') || lowerUrl.endsWith('.webm') || lowerUrl.endsWith('.ogv')) return false;
+  if (page.original?.width && page.original.width < 150) return false;
+
+  const titleLower = (page.title || '').toLowerCase();
+  if (
+    titleLower.includes('(franchise)') ||
+    titleLower.includes('(novel)') ||
+    titleLower.includes('(soundtrack)') ||
+    titleLower.includes('(video game)') ||
+    titleLower.includes('(disambiguation)')
+  ) {
+    return false;
+  }
+
+  if (!requireCategoryCheck) {
+    return true;
+  }
+
+  const cats = (page.categories ?? []).map((c) => (c.title || '').toLowerCase());
+  const isFilmCat = titleLower.includes('film') || cats.some((c) => c.includes('films'));
+  if (!isFilmCat) return false;
+
+  const yearStr = String(film.year);
+  const decadeStr = `${yearStr.slice(0, 3)}0s`;
+  return (
+    titleLower.includes(yearStr) ||
+    cats.some((c) => c.includes(yearStr) || c.includes(decadeStr))
+  );
 }
 
 async function main() {
@@ -171,46 +150,80 @@ async function main() {
     }
   }
 
-  console.log(`Resolviendo carteles teatrales para ${films.length} películas...`);
-  let foundCount = 0;
+  const pendingCount = films.filter((f) => !cache[f.id.toLowerCase()]?.posterUrl).length;
+  console.log(`Películas totales: ${films.length}. Ya en caché: ${films.length - pendingCount}. Pendientes: ${pendingCount}`);
 
-  for (let i = 0; i < films.length; i++) {
-    const film = films[i];
-    const key = film.id.toLowerCase();
-    if (cache[key]?.posterUrl) {
-      foundCount++;
-      continue;
-    }
+  const WIKI_OVERRIDES: Record<string, string> = {
+    'eyes-without-a-face': 'Eyes Without a Face (film)',
+    tetsuo: 'Tetsuo: The Iron Man',
+  };
 
-    const primaryTitle = (film.originalTitle || film.title).trim();
-    let res = await resolveWikiPoster(
-      'en',
-      [`${primaryTitle} (${film.year} film)`, `${primaryTitle} film`, `${film.title} ${film.year} horror film`],
-      film.year
-    );
+  // Pass 1: Fast batched title lookup (pageimages + categories)
+  const patterns: Array<{ build: (f: FilmRef) => string; requireCategory: boolean }> = [
+    {
+      build: (f) => WIKI_OVERRIDES[f.id] || `${(f.originalTitle || f.title).trim()} (${f.year} film)`,
+      requireCategory: false,
+    },
+    { build: (f) => `${(f.originalTitle || f.title).trim()} (film)`, requireCategory: false },
+    { build: (f) => `${(f.originalTitle || f.title).trim()}`, requireCategory: true },
+    { build: (f) => `${f.title.trim()} (${f.year} film)`, requireCategory: false },
+    { build: (f) => `${f.title.trim()}`, requireCategory: true },
+  ];
 
-    if (!res) {
-      res = await resolveWikiPoster(
-        'es',
-        [`${film.title} (película de ${film.year})`, `${film.title} película`, `${primaryTitle} película`],
-        film.year
-      );
-    }
+  for (const { build, requireCategory } of patterns) {
+    const stillMissing = films.filter((f) => !cache[f.id.toLowerCase()]?.posterUrl);
+    if (stillMissing.length === 0) break;
 
-    if (res) {
-      cache[key] = res;
-      foundCount++;
-    }
+    const batchSize = requireCategory ? 15 : 40;
+    for (let i = 0; i < stillMissing.length; i += batchSize) {
+      const slice = stillMissing.slice(i, i + batchSize);
+      const queries = slice.map(build);
+      const results = await queryEnBatch(queries, requireCategory);
 
-    if ((i + 1) % 5 === 0 || i === films.length - 1) {
+      for (let j = 0; j < slice.length; j++) {
+        const film = slice[j];
+        const page = results.get(queries[j]);
+        if (page && isMatchingFilmPage(page, film, requireCategory)) {
+          const rawUrl = page.original!.source!.split('?')[0];
+          cache[film.id.toLowerCase()] = {
+            posterUrl: `/api/poster-image?url=${encodeURIComponent(rawUrl)}`,
+            rawUrl,
+            source: 'Wikipedia (Cartel teatral)',
+            pageUrl:
+              page.canonicalurl ||
+              `https://en.wikipedia.org/wiki/${encodeURIComponent((page.title || '').replace(/ /g, '_'))}`,
+          };
+        }
+      }
+
       fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
-      console.log(`Progreso: ${i + 1}/${films.length} (${foundCount} carteles resueltos)`);
+      await sleep(800);
     }
-
-    await sleep(300);
   }
 
-  console.log(`Listo. Carteles almacenados en poster-cache.json: ${foundCount}/${films.length}`);
+  // Pass 2: Gentle fallback for any remaining stragglers
+  const stragglers = films.filter((f) => !cache[f.id.toLowerCase()]?.posterUrl);
+  if (stragglers.length > 0) {
+    console.log(`Resolviendo ${stragglers.length} títulos restantes...`);
+    for (const film of stragglers) {
+      const res = await resolveFilmPoster({
+        id: film.id,
+        title: film.title,
+        originalTitle: film.originalTitle,
+        year: film.year,
+        director: film.director,
+        retryOnRateLimit: true,
+      });
+      if (res.posterUrl) {
+        cache[film.id.toLowerCase()] = res;
+        fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
+      }
+      await sleep(1200);
+    }
+  }
+
+  const totalResolved = films.filter((f) => cache[f.id.toLowerCase()]?.posterUrl).length;
+  console.log(`Listo. Carteles almacenados en poster-cache.json: ${totalResolved}/${films.length}`);
 }
 
 main();

@@ -39,7 +39,7 @@ export function SubgenreCrossingsView({
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.28, delay: idx * 0.05, ease: [0.16, 1, 0.3, 1] }}
-            className="p-6 sm:p-8 rounded-lg bg-[#121216] border border-[#272730] space-y-6"
+            className="p-4 sm:p-8 rounded-lg bg-[#121216] border border-[#272730] space-y-5 sm:space-y-6"
           >
             {/* Crossing Header & Intersecting Branch Buttons */}
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-5 border-b border-[#272730]">
@@ -61,7 +61,7 @@ export function SubgenreCrossingsView({
                       soundEngine.playClick(210);
                       onExploreBranch(line.branchId);
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#18181D] border border-[#272730] hover:border-[#DC2626] text-xs font-medium text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0"
+                    className="inline-flex items-center gap-1.5 px-3 min-h-[40px] sm:min-h-0 sm:py-1.5 rounded bg-[#18181D] border border-[#272730] hover:border-[#DC2626] text-xs font-medium text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0"
                   >
                     <GitMerge className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
                     <span>Ir a {line.label}</span>

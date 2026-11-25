@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
+  Check,
+  ChevronLeft,
   ChevronRight,
   ExternalLink,
   Globe,
   Loader2,
   RotateCcw,
+  Share2,
   Shuffle,
+  SlidersHorizontal,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -21,6 +25,7 @@ import {
 } from '../data/horrorTaxonomy';
 import { soundEngine } from '../utils/soundEffects';
 import { FilmCard } from './FilmCard';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface WebSource {
   uri: string;
@@ -40,6 +45,7 @@ interface HorrorTreeSelectorProps {
   onSelectFilm: (film: HorrorFilm) => void;
   discoveredFilms: HorrorFilm[];
   onAddDiscoveredFilms: (films: HorrorFilm[]) => void;
+  onShareRoute: () => Promise<boolean>;
 }
 
 interface CurvePath {
@@ -61,18 +67,26 @@ export function HorrorTreeSelector({
   onSelectFilm,
   discoveredFilms,
   onAddDiscoveredFilms,
+  onShareRoute,
 }: HorrorTreeSelectorProps) {
   const [eraFilter, setEraFilter] = useState<'Todas' | EraType>('Todas');
   const [pacingFilter, setPacingFilter] = useState<'Todos' | PacingType>('Todos');
   const [goreFilter, setGoreFilter] = useState<'Todos' | GoreLevel>('Todos');
   const [posterMode, setPosterMode] = useState<'official' | 'artistic'>('official');
   const [audioEnabled, setAudioEnabled] = useState<boolean>(soundEngine.isEnabled());
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [copiedRoute, setCopiedRoute] = useState(false);
+
+  const [mobileStep, setMobileStep] = useState<1 | 2 | 3>(() =>
+    selectedSubgenreId ? 3 : selectedBranchId ? 2 : 1
+  );
 
   const [customQuery, setCustomQuery] = useState('');
   const [isSearchingWeb, setIsSearchingWeb] = useState(false);
   const [webError, setWebError] = useState<string | null>(null);
   const [webSources, setWebSources] = useState<WebSource[]>([]);
 
+  const resultsRef = useRef<HTMLElement | null>(null);
   const treeGridRef = useRef<HTMLDivElement | null>(null);
   const branchRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const subgenreRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -80,6 +94,16 @@ export function HorrorTreeSelector({
 
   const [paths1to2, setPaths1to2] = useState<CurvePath[]>([]);
   const [paths2to3, setPaths2to3] = useState<CurvePath[]>([]);
+
+  useEffect(() => {
+    if (!selectedBranchId) {
+      setMobileStep(1);
+    } else if (!selectedSubgenreId) {
+      setMobileStep(2);
+    } else {
+      setMobileStep(3);
+    }
+  }, [selectedBranchId, selectedSubgenreId]);
 
   const selectedBranch = HORROR_TAXONOMY.find((b) => b.id === selectedBranchId) ?? null;
   const selectedSubgenre =
@@ -178,22 +202,35 @@ export function HorrorTreeSelector({
 
   const handleBranchClick = (branchId: BranchId) => {
     soundEngine.playClick(185);
-    if (selectedBranchId === branchId) return;
+    if (selectedBranchId === branchId) {
+      setMobileStep(2);
+      return;
+    }
     onSelectBranch(branchId);
     onSelectSubgenre(null);
     onSelectFocus(null);
+    setMobileStep(2);
   };
 
   const handleSubgenreClick = (subId: string) => {
     soundEngine.playClick(235);
-    if (selectedSubgenreId === subId) return;
+    if (selectedSubgenreId === subId) {
+      setMobileStep(3);
+      return;
+    }
     onSelectSubgenre(subId);
     onSelectFocus(null);
+    setMobileStep(3);
   };
 
   const handleFocusClick = (focusId: string) => {
     soundEngine.playReveal();
     onSelectFocus(focusId);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      requestAnimationFrame(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
   };
 
   const handleRandomDescent = () => {
@@ -208,9 +245,15 @@ export function HorrorTreeSelector({
     onSelectBranch(randomBranch.id);
     onSelectSubgenre(randomSub.id);
     onSelectFocus(randomFocus.id);
+    setMobileStep(3);
     setEraFilter('Todas');
     setPacingFilter('Todos');
     setGoreFilter('Todos');
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      requestAnimationFrame(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
   };
 
   const allFilms = [...HORROR_FILMS, ...discoveredFilms];
@@ -304,21 +347,27 @@ export function HorrorTreeSelector({
   const externalMatching = filteredFilms.filter((f) => f.isExternalDiscovery);
   const displayedFilms = [...curatedSlice, ...externalMatching];
 
+  const activeFilterCount =
+    (eraFilter !== 'Todas' ? 1 : 0) +
+    (pacingFilter !== 'Todos' ? 1 : 0) +
+    (goreFilter !== 'Todos' ? 1 : 0);
+
   return (
-    <div className="space-y-10">
+    <div className="space-y-8 lg:space-y-10">
       {/* Stage Toolbar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-[#272730]">
         <nav
           aria-label="Ruta actual en el árbol de géneros"
-          className="flex flex-wrap items-center gap-1.5 text-sm"
+          className="flex flex-wrap items-center gap-1.5 text-xs sm:text-sm"
         >
           <button
             type="button"
             onClick={() => {
               soundEngine.playClick(160);
               onResetAll();
+              setMobileStep(1);
             }}
-            className={`px-2 py-1 rounded transition-colors ${
+            className={`px-2.5 min-h-[36px] sm:min-h-0 sm:py-1 rounded transition-colors ${
               !selectedBranch
                 ? 'text-[#F5F2EB] font-medium bg-[#18181D]'
                 : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
@@ -336,8 +385,9 @@ export function HorrorTreeSelector({
                   soundEngine.playClick(180);
                   onSelectSubgenre(null);
                   onSelectFocus(null);
+                  setMobileStep(2);
                 }}
-                className={`px-2 py-1 rounded transition-colors ${
+                className={`px-2.5 min-h-[36px] sm:min-h-0 sm:py-1 rounded transition-colors ${
                   !selectedSubgenre
                     ? 'text-[#F5F2EB] font-medium bg-[#18181D]'
                     : 'text-[#D6C7B2] hover:text-[#F5F2EB]'
@@ -356,8 +406,9 @@ export function HorrorTreeSelector({
                 onClick={() => {
                   soundEngine.playClick(200);
                   onSelectFocus(null);
+                  setMobileStep(3);
                 }}
-                className={`px-2 py-1 rounded transition-colors ${
+                className={`px-2.5 min-h-[36px] sm:min-h-0 sm:py-1 rounded transition-colors ${
                   !selectedFocus
                     ? 'text-[#F5F2EB] font-medium bg-[#18181D]'
                     : 'text-[#D6C7B2] hover:text-[#F5F2EB]'
@@ -371,14 +422,14 @@ export function HorrorTreeSelector({
           {selectedFocus && (
             <>
               <ChevronRight className="w-3.5 h-3.5 text-[#52525B]" aria-hidden="true" />
-              <span className="px-2 py-1 rounded bg-[#DC2626]/15 text-[#F5F2EB] font-medium">
+              <span className="px-2.5 py-1 rounded bg-[#DC2626]/15 text-[#F5F2EB] font-medium">
                 {selectedFocus.name}
               </span>
             </>
           )}
         </nav>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
           {/* Poster Art Mode Toggle */}
           <div
             role="group"
@@ -391,7 +442,7 @@ export function HorrorTreeSelector({
                 soundEngine.playClick(240);
                 setPosterMode('official');
               }}
-              className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 posterMode === 'official'
                   ? 'bg-[#DC2626] text-white'
                   : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
@@ -405,7 +456,7 @@ export function HorrorTreeSelector({
                 soundEngine.playClick(240);
                 setPosterMode('artistic');
               }}
-              className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 posterMode === 'artistic'
                   ? 'bg-[#272730] text-[#F5F2EB]'
                   : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
@@ -418,17 +469,17 @@ export function HorrorTreeSelector({
           <button
             type="button"
             onClick={handleRandomDescent}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#18181D] border border-[#272730] hover:border-[#DC2626] text-xs font-medium text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 min-h-[44px] sm:min-h-0 sm:py-2 rounded-lg bg-[#18181D] border border-[#272730] hover:border-[#DC2626] text-xs font-medium text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0"
           >
             <Shuffle className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
-            <span>Sugerencia al azar</span>
+            <span>Al azar</span>
           </button>
 
           <button
             type="button"
             onClick={handleToggleAudio}
             aria-pressed={audioEnabled}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+            className={`inline-flex items-center justify-center gap-2 px-3.5 min-h-[44px] sm:min-h-0 sm:py-2 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
               audioEnabled
                 ? 'bg-[#DC2626]/15 border-[#DC2626]/60 text-[#F5F2EB]'
                 : 'bg-[#121216] border-[#272730] text-[#A1A1AA] hover:text-[#F5F2EB]'
@@ -439,16 +490,299 @@ export function HorrorTreeSelector({
             ) : (
               <VolumeX className="w-3.5 h-3.5" aria-hidden="true" />
             )}
-            <span>{audioEnabled ? 'Audio activo' : 'Audio ambiente'}</span>
+            <span className="hidden sm:inline">{audioEnabled ? 'Audio activo' : 'Audio ambiente'}</span>
+            <span className="sm:hidden">{audioEnabled ? 'Audio' : 'Sonido'}</span>
           </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              soundEngine.playClick(250);
+              const ok = await onShareRoute();
+              if (ok) {
+                setCopiedRoute(true);
+                window.setTimeout(() => setCopiedRoute(false), 2000);
+              }
+            }}
+            className="inline-flex items-center justify-center gap-2 px-3.5 min-h-[44px] sm:min-h-0 sm:py-2 rounded-lg bg-[#18181D] border border-[#272730] hover:border-[#DC2626] text-xs font-medium text-[#F5F2EB] transition-colors whitespace-nowrap shrink-0"
+          >
+            {copiedRoute ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
+                <span>Enlace copiado</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-3.5 h-3.5 text-[#D6C7B2]" aria-hidden="true" />
+                <span>Compartir</span>
+              </>
+            )}
+          </button>
+
+          <PWAInstallButton />
         </div>
       </div>
 
-      {/* 3-Column Branching Genre Taxonomy */}
-      <section aria-label="Árbol de géneros y subgéneros del terror">
+      {/* MOBILE PROGRESSIVE STEPPER (< lg): 1 Level at a Time */}
+      <section aria-label="Selector paso a paso móvil" className="lg:hidden space-y-4">
+        {/* Stepper Tabs */}
+        <div
+          role="tablist"
+          aria-label="Pasos de selección"
+          className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730]"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileStep === 1}
+            onClick={() => {
+              soundEngine.playClick(180);
+              setMobileStep(1);
+            }}
+            className={`min-h-[44px] px-2 rounded text-xs font-medium transition-colors truncate ${
+              mobileStep === 1
+                ? 'bg-[#DC2626] text-white'
+                : 'text-[#D4D4D8] hover:text-[#F5F2EB]'
+            }`}
+          >
+            1. Género
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileStep === 2}
+            disabled={!selectedBranch}
+            onClick={() => {
+              if (!selectedBranch) return;
+              soundEngine.playClick(200);
+              setMobileStep(2);
+            }}
+            className={`min-h-[44px] px-2 rounded text-xs font-medium transition-colors truncate disabled:opacity-40 ${
+              mobileStep === 2
+                ? 'bg-[#DC2626] text-white'
+                : 'text-[#D4D4D8] hover:text-[#F5F2EB]'
+            }`}
+          >
+            2. Subgénero
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileStep === 3}
+            disabled={!selectedSubgenre}
+            onClick={() => {
+              if (!selectedSubgenre) return;
+              soundEngine.playClick(220);
+              setMobileStep(3);
+            }}
+            className={`min-h-[44px] px-2 rounded text-xs font-medium transition-colors truncate disabled:opacity-40 ${
+              mobileStep === 3
+                ? 'bg-[#DC2626] text-white'
+                : 'text-[#D4D4D8] hover:text-[#F5F2EB]'
+            }`}
+          >
+            3. Enfoque
+          </button>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {mobileStep === 1 && (
+            <motion.div
+              key="mobile-step-1"
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 8 }}
+              transition={{ duration: 0.18 }}
+              className="space-y-2.5"
+            >
+              <div className="flex items-baseline justify-between">
+                <h2 className="font-display text-xl font-semibold text-[#F5F2EB]">
+                  Elige el gran género
+                </h2>
+                <span className="text-xs font-mono text-[#A1A1AA]">Paso 1 de 3</span>
+              </div>
+
+              {HORROR_TAXONOMY.map((branch) => {
+                const isSelected = selectedBranchId === branch.id;
+                return (
+                  <button
+                    key={branch.id}
+                    type="button"
+                    onClick={() => handleBranchClick(branch.id)}
+                    aria-pressed={isSelected}
+                    className={`group relative w-full text-left rounded-lg overflow-hidden border transition-all min-h-[72px] ${
+                      isSelected
+                        ? 'border-[#DC2626] bg-[#161215]'
+                        : 'border-[#272730] bg-[#121216] hover:border-[#52525B]'
+                    }`}
+                  >
+                    <img
+                      src={branch.image}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      className={`absolute inset-0 w-full h-full object-cover ${
+                        isSelected ? 'opacity-35' : 'opacity-20'
+                      }`}
+                    />
+                    <div
+                      className="absolute inset-0 bg-gradient-to-r from-[#08080A]/95 via-[#08080A]/80 to-[#08080A]/60"
+                      aria-hidden="true"
+                    />
+                    <div className="relative p-3.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="font-mono text-[11px] text-[#DC2626] block">
+                          {branch.index}. Rama principal · 18 títulos
+                        </span>
+                        <p className="font-display text-xl font-semibold text-[#F5F2EB] leading-snug">
+                          {branch.name}
+                        </p>
+                        <p className="text-xs text-[#A1A1AA] mt-0.5 line-clamp-1">
+                          {branch.coreQuestion}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-[#D6C7B2] shrink-0" aria-hidden="true" />
+                    </div>
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+
+          {mobileStep === 2 && selectedBranch && (
+            <motion.div
+              key={`mobile-step-2-${selectedBranch.id}`}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.18 }}
+              className="space-y-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMobileStep(1)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-[#D6C7B2] hover:text-[#F5F2EB] min-h-[44px] pr-2"
+                >
+                  <ChevronLeft className="w-4 h-4 text-[#DC2626]" aria-hidden="true" />
+                  <span>Cambiar género ({selectedBranch.name})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                  className="text-xs font-mono text-[#DC2626] underline underline-offset-4 min-h-[44px] px-1 whitespace-nowrap"
+                >
+                  Ver películas ({displayedFilms.length})
+                </button>
+              </div>
+
+              {selectedBranch.subgenres.map((sub, idx) => {
+                const isSelected = selectedSubgenreId === sub.id;
+                return (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => handleSubgenreClick(sub.id)}
+                    aria-pressed={isSelected}
+                    className={`w-full text-left p-4 rounded-lg border transition-all flex items-center justify-between gap-3 ${
+                      isSelected
+                        ? 'border-[#DC2626] bg-[#181215]'
+                        : 'border-[#272730] bg-[#121216] hover:border-[#52525B]'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <span className="font-mono text-xs text-[#D6C7B2] block mb-0.5">
+                        Subgénero {selectedBranch.index}.{idx + 1} · 6 títulos
+                      </span>
+                      <p className="font-display text-xl font-semibold text-[#F5F2EB]">
+                        {sub.name}
+                      </p>
+                      <p className="text-xs text-[#A1A1AA] mt-1 leading-relaxed">
+                        {sub.description}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-[#D6C7B2] shrink-0" aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+
+          {mobileStep === 3 && selectedBranch && selectedSubgenre && (
+            <motion.div
+              key={`mobile-step-3-${selectedSubgenre.id}`}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.18 }}
+              className="space-y-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMobileStep(2)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-[#D6C7B2] hover:text-[#F5F2EB] min-h-[44px] pr-2"
+                >
+                  <ChevronLeft className="w-4 h-4 text-[#DC2626]" aria-hidden="true" />
+                  <span>Cambiar subgénero ({selectedSubgenre.name})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                  className="text-xs font-mono text-[#DC2626] underline underline-offset-4 min-h-[44px] px-1 whitespace-nowrap"
+                >
+                  Ir a resultados ({displayedFilms.length})
+                </button>
+              </div>
+
+              {selectedSubgenre.focuses.map((foc, idx) => {
+                const isSelected = selectedFocusId === foc.id;
+                return (
+                  <button
+                    key={foc.id}
+                    type="button"
+                    onClick={() => handleFocusClick(foc.id)}
+                    aria-pressed={isSelected}
+                    className={`w-full text-left p-4 rounded-lg border transition-all ${
+                      isSelected
+                        ? 'border-[#DC2626] bg-[#1D1215]'
+                        : 'border-[#272730] bg-[#121216] hover:border-[#52525B]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-mono text-xs text-[#DC2626]">
+                        Enfoque {idx === 0 ? 'A' : 'B'}
+                      </span>
+                      <span className="text-xs font-mono text-[#A1A1AA] tabular-nums">
+                        3 películas
+                      </span>
+                    </div>
+                    <p className="font-display text-2xl font-semibold text-[#F5F2EB] leading-snug">
+                      {foc.name}
+                    </p>
+                    <p className="text-xs text-[#D4D4D8] mt-1 leading-relaxed">
+                      {foc.subtitle}
+                    </p>
+                    <div className="mt-2.5 pt-2.5 border-t border-white/5 text-xs text-[#A1A1AA]">
+                      <span className="font-mono text-[#D6C7B2]">Atmósfera: </span>
+                      {foc.atmosphereNote}
+                    </div>
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
+
+      {/* DESKTOP 3-Column Branching Genre Taxonomy (lg+) */}
+      <section aria-label="Árbol de géneros y subgéneros del terror" className="hidden lg:block">
         <div
           ref={treeGridRef}
-          className="relative grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-14 items-start"
+          className="relative grid grid-cols-3 gap-14 items-start"
         >
           {/* Animated SVG Bézier Connectors */}
           <svg
@@ -693,10 +1027,11 @@ export function HorrorTreeSelector({
 
       {/* Preference Filters & Curated Results */}
       <section
+        ref={resultsRef}
         aria-label="Películas recomendadas"
-        className="pt-8 border-t border-[#272730] space-y-6"
+        className="pt-6 sm:pt-8 border-t border-[#272730] space-y-5 sm:space-y-6 scroll-mt-4"
       >
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 sm:gap-6">
           <div>
             <p className="text-xs font-mono text-[#DC2626] mb-1">
               {selectedFocus
@@ -705,7 +1040,7 @@ export function HorrorTreeSelector({
                   ? 'Vista previa de la rama'
                   : 'Elige una ruta para empezar'}
             </p>
-            <h2 className="font-display text-3xl font-semibold text-[#F5F2EB] text-balance">
+            <h2 className="font-display text-2xl sm:text-3xl font-semibold text-[#F5F2EB] text-balance">
               {selectedFocus
                 ? selectedFocus.name
                 : selectedSubgenre
@@ -718,74 +1053,109 @@ export function HorrorTreeSelector({
               {selectedFocus
                 ? `${selectedFocus.subtitle}. Atmósfera predominante: ${selectedFocus.atmosphereNote.toLowerCase()}.`
                 : selectedBranch
-                  ? 'Afina bajando al siguiente nivel del árbol o ajusta tus preferencias de época, ritmo y nivel gráfico.'
-                  : 'Navega de mayor a menor por el diagrama superior o pulsa en Sugerencia al azar.'}
+                  ? 'Afina bajando al siguiente nivel o ajusta tus preferencias de época, ritmo y nivel gráfico.'
+                  : 'Navega paso a paso arriba o pulsa en Al azar.'}
             </p>
           </div>
 
           {selectedBranch && (
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Era Filter */}
-              <div className="flex items-center gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730]">
-                {(['Todas', 'Clásico', 'Moderno'] as const).map((era) => (
+            <div className="space-y-3">
+              {/* Mobile Filter Toggle Button */}
+              <div className="sm:hidden flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowMobileFilters((v) => !v)}
+                  aria-expanded={showMobileFilters}
+                  className="inline-flex items-center gap-2 px-3.5 min-h-[44px] rounded-lg bg-[#121216] border border-[#272730] text-xs font-medium text-[#F5F2EB]"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
+                  <span>
+                    {showMobileFilters ? 'Ocultar filtros' : 'Filtrar época, ritmo o gore'}
+                    {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                  </span>
+                </button>
+                {activeFilterCount > 0 && (
                   <button
-                    key={era}
                     type="button"
                     onClick={() => {
-                      soundEngine.playClick(250);
-                      setEraFilter(era);
+                      setEraFilter('Todas');
+                      setPacingFilter('Todos');
+                      setGoreFilter('Todos');
                     }}
-                    className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                      eraFilter === era
-                        ? 'bg-[#DC2626] text-white'
-                        : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
-                    }`}
+                    className="text-xs text-[#DC2626] min-h-[44px] px-2"
                   >
-                    {era === 'Todas' ? 'Cualquier época' : era}
+                    Limpiar
                   </button>
-                ))}
+                )}
               </div>
 
-              {/* Pacing Filter */}
-              <div className="flex items-center gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730]">
-                {(['Todos', 'Lento', 'Equilibrado', 'Frenético'] as const).map((pace) => (
-                  <button
-                    key={pace}
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playClick(265);
-                      setPacingFilter(pace);
-                    }}
-                    className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                      pacingFilter === pace
-                        ? 'bg-[#272730] text-[#F5F2EB]'
-                        : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
-                    }`}
-                  >
-                    {pace === 'Todos' ? 'Cualquier ritmo' : pace}
-                  </button>
-                ))}
-              </div>
+              <div
+                className={`${
+                  showMobileFilters ? 'flex' : 'hidden sm:flex'
+                } flex-wrap items-center gap-2.5`}
+              >
+                {/* Era Filter */}
+                <div className="flex items-center gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730] overflow-x-auto max-w-full">
+                  {(['Todas', 'Clásico', 'Moderno'] as const).map((era) => (
+                    <button
+                      key={era}
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playClick(250);
+                        setEraFilter(era);
+                      }}
+                      className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                        eraFilter === era
+                          ? 'bg-[#DC2626] text-white'
+                          : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
+                      }`}
+                    >
+                      {era === 'Todas' ? 'Cualquier época' : era}
+                    </button>
+                  ))}
+                </div>
 
-              {/* Gore Filter */}
-              <div className="flex items-center gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730]">
-                {(['Todos', 'Sutil', 'Moderado', 'Explícito'] as const).map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playClick(280);
-                      setGoreFilter(g);
-                    }}
-                    className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                      goreFilter === g
-                        ? 'bg-[#272730] text-[#F5F2EB]'
-                        : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
-                    }`}
-                  >
-                    {g === 'Todos' ? 'Todo nivel gráfico' : `Gore ${g.toLowerCase()}`}
-                  </button>
-                ))}
+                {/* Pacing Filter */}
+                <div className="flex items-center gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730] overflow-x-auto max-w-full">
+                  {(['Todos', 'Lento', 'Equilibrado', 'Frenético'] as const).map((pace) => (
+                    <button
+                      key={pace}
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playClick(265);
+                        setPacingFilter(pace);
+                      }}
+                      className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                        pacingFilter === pace
+                          ? 'bg-[#272730] text-[#F5F2EB]'
+                          : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
+                      }`}
+                    >
+                      {pace === 'Todos' ? 'Cualquier ritmo' : pace}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Gore Filter */}
+                <div className="flex items-center gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730] overflow-x-auto max-w-full">
+                  {(['Todos', 'Sutil', 'Moderado', 'Explícito'] as const).map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playClick(280);
+                        setGoreFilter(g);
+                      }}
+                      className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                        goreFilter === g
+                          ? 'bg-[#272730] text-[#F5F2EB]'
+                          : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
+                      }`}
+                    >
+                      {g === 'Todos' ? 'Todo nivel gráfico' : `Gore ${g.toLowerCase()}`}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}

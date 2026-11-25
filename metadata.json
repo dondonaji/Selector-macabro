@@ -1,5 +1,5 @@
 {
-  "name": "Linaje Macabro",
+  "name": "Selector Macabro",
   "description": "Seleccionador interactivo de cine de terror basado en mapas taxonómicos de géneros y subgéneros: explora de mayor a menor y encuentra qué película ver según el tipo de miedo que buscas.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

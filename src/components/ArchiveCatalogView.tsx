@@ -154,7 +154,7 @@ export function ArchiveCatalogView({
             type="button"
             onClick={handleDiscoverArchive}
             disabled={isSearchingWeb}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-60 text-white text-xs font-medium transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center justify-center gap-2 px-4 min-h-[44px] sm:min-h-0 sm:py-2.5 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-60 text-white text-xs font-medium transition-colors whitespace-nowrap shrink-0"
           >
             {isSearchingWeb ? (
               <>
@@ -172,12 +172,12 @@ export function ArchiveCatalogView({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-lg bg-[#121216] border border-[#272730]">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#121216] border border-[#272730] overflow-x-auto max-w-full sm:flex-wrap">
           <button
             type="button"
             onClick={() => setBranchFilter('all')}
-            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+            className={`px-3 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
               branchFilter === 'all'
                 ? 'bg-[#DC2626] text-white'
                 : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
@@ -190,7 +190,7 @@ export function ArchiveCatalogView({
               key={b.id}
               type="button"
               onClick={() => setBranchFilter(b.id)}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-3 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 branchFilter === b.id
                   ? 'bg-[#DC2626] text-white'
                   : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
@@ -201,14 +201,14 @@ export function ArchiveCatalogView({
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730]">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-[#121216] border border-[#272730] overflow-x-auto max-w-full">
             {(['Todos', 'Sutil', 'Moderado', 'Explícito'] as const).map((g) => (
               <button
                 key={g}
                 type="button"
                 onClick={() => setGoreFilter(g)}
-                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                className={`px-3 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                   goreFilter === g
                     ? 'bg-[#272730] text-[#F5F2EB]'
                     : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
@@ -227,7 +227,7 @@ export function ArchiveCatalogView({
             <button
               type="button"
               onClick={() => setPosterMode('official')}
-              className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 posterMode === 'official'
                   ? 'bg-[#DC2626] text-white'
                   : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
@@ -238,7 +238,7 @@ export function ArchiveCatalogView({
             <button
               type="button"
               onClick={() => setPosterMode('artistic')}
-              className={`px-2.5 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-2.5 min-h-[38px] sm:min-h-0 sm:py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 posterMode === 'artistic'
                   ? 'bg-[#272730] text-[#F5F2EB]'
                   : 'text-[#A1A1AA] hover:text-[#F5F2EB]'

@@ -3,8 +3,10 @@ import {
   ArrowRight,
   Bookmark,
   BookmarkCheck,
+  Check,
   ExternalLink,
   GitFork,
+  Share2,
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -18,6 +20,7 @@ interface FilmDossierModalProps {
   onToggleSave: (filmId: string) => void;
   onJumpToFilm: (film: HorrorFilm) => void;
   onExploreBranch: (branchId: BranchId, subgenreId?: string, focusId?: string) => void;
+  onShareFilm: (film: HorrorFilm) => Promise<boolean>;
 }
 
 export function FilmDossierModal({
@@ -27,9 +30,11 @@ export function FilmDossierModal({
   onToggleSave,
   onJumpToFilm,
   onExploreBranch,
+  onShareFilm,
 }: FilmDossierModalProps) {
   const [posterMode, setPosterMode] = useState<'official' | 'artistic'>('official');
   const [posterMeta, setPosterMeta] = useState<PosterResult | null>(null);
+  const [copiedFilm, setCopiedFilm] = useState(false);
 
   useEffect(() => {
     if (!film) return;
@@ -72,7 +77,7 @@ export function FilmDossierModal({
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
         onClick={onClose}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-6 overflow-y-auto"
         role="dialog"
         aria-modal="true"
         aria-labelledby="dossier-title"
@@ -84,20 +89,25 @@ export function FilmDossierModal({
           exit={{ opacity: 0, y: 12, scale: 0.98 }}
           transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-3xl bg-[#121216] border border-[#272730] rounded-lg overflow-hidden my-auto max-h-[90vh] flex flex-col"
+          className="relative w-full max-w-3xl bg-[#121216] border border-[#272730] rounded-t-2xl sm:rounded-lg overflow-hidden sm:my-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col"
         >
+          {/* Mobile Sheet Grab Handle */}
+          <div className="sm:hidden pt-3 pb-1 flex justify-center shrink-0" aria-hidden="true">
+            <span className="w-10 h-1 rounded-full bg-[#272730]" />
+          </div>
+
           {/* Close button */}
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar ficha de película"
-            className="absolute top-4 right-4 z-20 p-2 rounded-lg bg-[#08080A]/85 border border-[#272730] text-[#D4D4D8] hover:text-[#F5F2EB] hover:border-[#DC2626] transition-colors focus-visible:outline-2 focus-visible:outline-[#DC2626]"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2 flex items-center justify-center rounded-lg bg-[#08080A]/85 border border-[#272730] text-[#D4D4D8] hover:text-[#F5F2EB] hover:border-[#DC2626] transition-colors focus-visible:outline-2 focus-visible:outline-[#DC2626]"
           >
             <X className="w-4 h-4" />
           </button>
 
           {/* Scrollable Body */}
-          <div className="p-6 space-y-6 overflow-y-auto">
+          <div className="p-4 sm:p-6 space-y-6 overflow-y-auto">
             {/* Hero Split: 2:3 Poster + Title & Metadata */}
             <div className="grid grid-cols-1 sm:grid-cols-[175px_1fr] gap-6 items-start pb-6 border-b border-[#272730]">
               <div className="space-y-2.5 max-w-[180px] mx-auto sm:mx-0 w-full">
@@ -118,7 +128,7 @@ export function FilmDossierModal({
                   <button
                     type="button"
                     onClick={() => setPosterMode('official')}
-                    className={`flex-1 py-1 rounded text-[11px] font-medium transition-colors ${
+                    className={`flex-1 min-h-[38px] sm:min-h-0 sm:py-1 rounded text-[11px] font-medium transition-colors ${
                       posterMode === 'official'
                         ? 'bg-[#DC2626] text-white'
                         : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
@@ -129,7 +139,7 @@ export function FilmDossierModal({
                   <button
                     type="button"
                     onClick={() => setPosterMode('artistic')}
-                    className={`flex-1 py-1 rounded text-[11px] font-medium transition-colors ${
+                    className={`flex-1 min-h-[38px] sm:min-h-0 sm:py-1 rounded text-[11px] font-medium transition-colors ${
                       posterMode === 'artistic'
                         ? 'bg-[#272730] text-[#F5F2EB]'
                         : 'text-[#A1A1AA] hover:text-[#F5F2EB]'
@@ -297,19 +307,44 @@ export function FilmDossierModal({
           </div>
 
           {/* Sticky Footer */}
-          <div className="px-6 py-4 border-t border-[#272730] bg-[#0E0E12] flex items-center justify-between gap-4 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-[#A1A1AA] hover:text-[#F5F2EB] transition-colors"
-            >
-              Volver al selector
-            </button>
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-[#272730] bg-[#0E0E12] flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3 min-h-[44px] text-xs font-medium text-[#A1A1AA] hover:text-[#F5F2EB] transition-colors"
+              >
+                Volver
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const ok = await onShareFilm(film);
+                  if (ok) {
+                    setCopiedFilm(true);
+                    window.setTimeout(() => setCopiedFilm(false), 2000);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-lg bg-[#18181D] border border-[#272730] hover:border-[#DC2626] text-xs font-medium text-[#D4D4D8] hover:text-[#F5F2EB] transition-colors"
+              >
+                {copiedFilm ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-[#DC2626]" aria-hidden="true" />
+                    <span>Enlace copiado</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-3.5 h-3.5 text-[#D6C7B2]" aria-hidden="true" />
+                    <span>Compartir</span>
+                  </>
+                )}
+              </button>
+            </div>
 
             <button
               type="button"
               onClick={() => onToggleSave(film.id)}
-              className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              className={`inline-flex items-center justify-center gap-2 px-5 min-h-[44px] rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 isSaved
                   ? 'bg-[#18181D] text-[#F5F2EB] border border-[#DC2626]'
                   : 'bg-[#DC2626] text-white hover:bg-[#B91C1C]'
