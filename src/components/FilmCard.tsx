@@ -49,13 +49,9 @@ export function FilmCard({
               mode={posterMode}
               className="rounded-none sm:rounded border-0 border-b border-[#272730] sm:border"
             />
-            <div
-              className="sm:hidden absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#121216] via-[#121216]/55 to-transparent pointer-events-none"
-              aria-hidden="true"
-            />
           </button>
 
-          <div className="min-w-0 px-4 pt-2 sm:p-0">
+          <div className="min-w-0 px-4 pt-3.5 sm:p-0">
             {/* Unboxed Metadata Line */}
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-mono text-[#D6C7B2] tabular-nums mb-1">
               <span>{film.year}</span>

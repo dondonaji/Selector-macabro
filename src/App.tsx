@@ -95,8 +95,8 @@ function parseRouteFromSearch(search: string, extraFilms: HorrorFilm[] = []): Ro
   if (!hasAnyParam) {
     return {
       activeTab: 'tree',
-      branchId: 'paranormal',
-      subgenreId: 'folclore-maldiciones',
+      branchId: null,
+      subgenreId: null,
       focusId: null,
       filmDossier: null,
     };
@@ -139,8 +139,8 @@ export default function App() {
       ? parseRouteFromSearch(window.location.search)
       : {
           activeTab: 'tree',
-          branchId: 'paranormal',
-          subgenreId: 'folclore-maldiciones',
+          branchId: null,
+          subgenreId: null,
           focusId: null,
           filmDossier: null,
         }
@@ -577,47 +577,50 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Content Stage */}
-      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {activeTab === 'tree' && (
-          <section
-            aria-label="Introducción al selector"
-            className="relative mb-6 sm:mb-9 rounded-xl overflow-hidden border border-[#272730] bg-[#0B0B0E]"
-          >
-            {/* Atmospheric Screening Room Backdrop */}
-            <img
-              src={heroBackdropImg}
-              alt=""
-              aria-hidden="true"
-              className="absolute inset-0 w-full h-full object-cover object-center opacity-50 sm:opacity-45"
-            />
-            <div
-              className="absolute inset-0 bg-gradient-to-t from-[#08080A] via-[#08080A]/65 to-[#08080A]/45"
-              aria-hidden="true"
-            />
-            <div
-              className="absolute inset-0 bg-gradient-to-r from-[#08080A]/90 via-[#08080A]/55 to-transparent"
-              aria-hidden="true"
-            />
-            <div
-              className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,_rgba(220,38,38,0.16),_transparent_58%)] pointer-events-none"
-              aria-hidden="true"
-            />
+      {/* Full-Bleed Atmospheric Reception Hero (Selector Tab) */}
+      {activeTab === 'tree' && (
+        <section
+          aria-label="Introducción al selector"
+          className="relative z-10 overflow-hidden bg-[#08080A]"
+        >
+          <img
+            src={heroBackdropImg}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover object-center opacity-45 sm:opacity-40 scale-[1.02]"
+          />
+          <div
+            className="absolute inset-0 bg-gradient-to-b from-[#08080A]/75 via-[#08080A]/45 to-[#08080A]"
+            aria-hidden="true"
+          />
+          <div
+            className="absolute inset-0 bg-gradient-to-r from-[#08080A]/85 via-[#08080A]/40 to-transparent"
+            aria-hidden="true"
+          />
+          <div
+            className="absolute inset-0 bg-[radial-gradient(circle_at_18%_35%,_rgba(220,38,38,0.18),_transparent_56%)] pointer-events-none"
+            aria-hidden="true"
+          />
 
-            <div className="relative z-10 px-5 py-7 sm:px-8 sm:py-11 lg:px-10 lg:py-12 max-w-3xl">
-              <p className="text-[11px] sm:text-xs font-mono tracking-wider uppercase text-[#DC2626] mb-2">
-                Mapa taxonómico · {HORROR_FILMS.length + discoveredFilms.length} obras
-              </p>
-              <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-[#F5F2EB] leading-[1.03] tracking-tight text-balance drop-shadow-[0_2px_18px_rgba(0,0,0,0.85)]">
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-7 pb-6 sm:pt-12 sm:pb-9">
+            <div className="max-w-3xl">
+              <h1 className="font-display text-[2.6rem] sm:text-5xl lg:text-[4rem] font-semibold text-[#F5F2EB] leading-[0.98] tracking-tight text-balance drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
                 Encuentra el terror exacto para esta noche
               </h1>
-              <p className="text-xs sm:text-sm text-[#A1A1AA]/75 mt-2.5 sm:mt-3 max-w-xl leading-relaxed">
-                Desciende por ramas desde los cinco troncos del género hasta tu atmósfera ideal.
+              <p className="text-xs sm:text-sm text-[#A1A1AA]/75 mt-3 max-w-lg leading-relaxed">
+                {HORROR_FILMS.length + discoveredFilms.length} películas esenciales ordenadas en tres decisiones: género, subgénero y atmósfera.
               </p>
             </div>
-          </section>
-        )}
+          </div>
+        </section>
+      )}
 
+      {/* Main Content Stage */}
+      <main
+        className={`relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 ${
+          activeTab === 'tree' ? 'pt-2 pb-8 sm:pt-3 sm:pb-12' : 'py-5 sm:py-9'
+        }`}
+      >
         <AnimatePresence mode="wait">
           {activeTab === 'tree' && (
             <motion.div
@@ -637,6 +640,12 @@ export default function App() {
                 onSelectSubgenre={setSelectedSubgenreId}
                 onSelectFocus={setSelectedFocusId}
                 onResetAll={handleResetTree}
+                onRandomDescent={handleRandomDescent}
+                onOpenArchive={() => {
+                  soundEngine.playClick(200);
+                  setActiveTab('archive');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 savedIds={savedIds}
                 onToggleSave={handleToggleSave}
                 onSelectFilm={setActiveFilmDossier}
